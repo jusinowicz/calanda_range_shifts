@@ -9,6 +9,7 @@
 library(mgcv)
 library(MASS)
 library(fields)
+source("./wald_functions1.R")
 source("./range_coexistence_functionsWALD.R")
 #source("./range_coexistence_functionsD.R") #The old library
 
@@ -740,8 +741,6 @@ for(sp in 1:length(spp)){
 #Or take the average (since there's not that much variation), but load the
 #other function file:
 sr=colMeans(sr_krigB)
-source("./wald_functions1.R")
-
 
 ###Competition coeffcients
 # diag(arat3)=c(1,1,1)
@@ -958,10 +957,10 @@ for ( s in 1:nspp) {
 		
 		
 		#Get the equilibrium of the resident community when invader is absent
-		nr[t,,(s.index)] = get.res.eq(Frs[t,,],s.index,sr,alphas, fkd,kd.yes,kc,fast=TRUE, burns = 5 )
+		nr[t,,(s.index)] = get.res.eq(Frs[t,,],s.index,sr,alphas, fkd,fkd.yes,kc,fast=TRUE, burns = 5 )
 		for (sp in 1:(nspp-1)){ 
 			#Get the pairwise resident equilibrium
-			nr.p[t,,s.index[sp]] = get.res.eq(Frs[t,,],s.index[sp],sr,alphas, fkd,kd.yes,kc,fast=TRUE )
+			nr.p[t,,s.index[sp]] = get.res.eq(Frs[t,,],s.index[sp],sr,alphas, fkd,fkd.yes,kc,fast=TRUE, burns = 5)
 		}
 
 		#This is the analytical version of each resident's equilibrium density when it is alone. 
@@ -972,11 +971,11 @@ for ( s in 1:nspp) {
 
 
 		#Get the low-density equilibrium density of the invader against the resident community
-		nr[t,,s] = get.inv.ldeq(Frs[t,,], nr[t,,], s, sr,alphas, fkd, kd.yes, kc,fast=TRUE )
+		nr[t,,s] = get.inv.ldeq(Frs[t,,], nr[t,,], s, sr,alphas, fkd, fkd.yes, kc,fast=TRUE, burns = 5 )
 		for (sp in 1:(nspp-1)){ 
 			if(s<s.index[sp]) {s.inv=1}else{s.inv=2}
 			#Get the pairwise invader low-density equilibrium 
-			ni.p[t,,s.index[sp]] =get.inv.ldeq(Frs[t,,sort(c(s,s.index[sp]))], nr.p[t,,sort(c(s,s.index[sp]))], s.inv, sr,alphas, fkd,kd.yes,kc,fast=TRUE )
+			ni.p[t,,s.index[sp]] =get.inv.ldeq(Frs[t,,sort(c(s,s.index[sp]))], nr.p[t,,sort(c(s,s.index[sp]))], s.inv, sr,alphas, fkd,fkd.yes,kc,fast=TRUE, burns = 5 )
 		}
 
 

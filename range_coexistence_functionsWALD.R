@@ -250,7 +250,7 @@ pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, fkd.yes=FALSE, kc.s
 
 	#When fkd.yes=FALSE: 
 	#Transform dispersal and competition kernels
-	if( fkd.yes = FALSE){ 
+	if( fkd.yes == FALSE){ 
 		if(het_kern==1){
 			fkd = kd.spp*0
 
@@ -786,6 +786,8 @@ get.isd.pair = function(Fr.spp, nr.spp, sr.spp,alpha.ir,kd.spp,kc.spp ){
 #			-This should be a matrix with species as columns
 #	sr.spp 	The survival of the invader.
 #	kd.spp 	The invader dispersal kernel
+#	fkd.yes If this is yes, then it is the Fourier transformed kernels being
+#			passed to the function
 #	alpha.ir Interspecific competetion with residents
 #			- passed as the invader's row in competition matrix
 #	a_rr 	Parameter for competition kernel
@@ -793,7 +795,7 @@ get.isd.pair = function(Fr.spp, nr.spp, sr.spp,alpha.ir,kd.spp,kc.spp ){
 #			-If this matrix is a single column then it is used
 #			-used iteratively/identically across interactions	 
 
-get.fd.cov = function (Fr.spp, sp.ids, nrs.spp, sr.spp, alpha.ir, a_rr, kc.spp){ 
+get.fd.cov = function (Fr.spp, sp.ids, nrs.spp, sr.spp, alpha.ir, a_rr, kd.spp, fkd.yes=FALSE, kc.spp){ 
 	
 	np=length(Fr.spp)
 	inv.id = sp.ids[1] #Invader
