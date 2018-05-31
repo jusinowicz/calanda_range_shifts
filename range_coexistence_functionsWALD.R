@@ -237,7 +237,7 @@ get.fast.peak = function(peak.new,Fr,Ds,cs_all,stc,np){
 #	fkd.yes If this is yes, then it is the Fourier transformed kernels being
 #			passed to the function
 #	kc.spp 	Competition kernels
-pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, fkd.yes=FALSE, kc.spp){
+pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, kc.spp,fkd.yes=FALSE){
 
 	Frs.spp = as.matrix(Frs.spp)
 	np = dim(as.matrix(Frs.spp))[1] #Space
@@ -245,6 +245,8 @@ pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, fkd.yes=FALSE, kc.s
 	
 	#Check the dimensionality of the dispersal kernel. If it is a spatially 
 	#heteroeneous dispersal kernel, then set het_kern=1
+
+	het_kern=0
 
 	if (!is.na(dim(kd.spp)[3])){ het_kern=1 } 
 
@@ -386,7 +388,7 @@ pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, fkd.yes=FALSE, kc.s
 #			which is much faster, but potentially less accurate. 
 #	fast.tol Test for equilibrium: how close is slope to 0? Default = 1e-5
 #
-get.res.eq = function(Frs.spp,s.index,sr.spp,alpha.spp,kd.spp, fkd.yes =FALSE, kc.spp,burns=500, burns.max = 10,tol=1,fast=FALSE,fast.tol=1e-5){
+get.res.eq = function(Frs.spp,s.index,sr.spp,alpha.spp,kd.spp,  kc.spp,fkd.yes =FALSE,burns=500, burns.max = 10,tol=1,fast=FALSE,fast.tol=1e-5){
 
 	np = dim(as.matrix(Frs.spp))[1] #Space
 	nspp = length(s.index) #Number of residents
@@ -404,7 +406,7 @@ get.res.eq = function(Frs.spp,s.index,sr.spp,alpha.spp,kd.spp, fkd.yes =FALSE, k
 		#Start each burn iteration
 		for (n in 1:(burns-1)) {
 		
-			nr.burns[(n+1),,] = pop_lg(Frs.spp ,nr.burns[n,,], sr.spp,alpha.spp,kd.spp, fkd.yes, kc.spp)
+			nr.burns[(n+1),,] = pop_lg(Frs.spp ,nr.burns[n,,], sr.spp,alpha.spp,kd.spp,  kc.spp, fkd.yes)
 			print(paste ("first", n, sep=" "))
 		}
 
@@ -471,7 +473,7 @@ get.res.eq = function(Frs.spp,s.index,sr.spp,alpha.spp,kd.spp, fkd.yes =FALSE, k
 #			which is much faster, but potentially less accurate. 
 #	fast.tol Test for equilibrium: how close is slope to 0? Default = 1e-5
 
-get.inv.ldeq = function(Frs.spp, nr.res,s.inv,sr.spp,alpha.spp,kd.spp, fkd.yes =FALSE, kc.spp,burns=500, burns.max = 10,tol=1,fast=FALSE,fast.tol=1e-5){
+get.inv.ldeq = function(Frs.spp, nr.res,s.inv,sr.spp,alpha.spp,kd.spp,  kc.spp,fkd.yes =FALSE,burns=500, burns.max = 10,tol=1,fast=FALSE,fast.tol=1e-5){
 
 	np = dim(as.matrix(Frs.spp))[1] #Space
 	nspp = dim(as.matrix(Frs.spp))[2] #Number of species
@@ -491,7 +493,7 @@ get.inv.ldeq = function(Frs.spp, nr.res,s.inv,sr.spp,alpha.spp,kd.spp, fkd.yes =
 	while (b <= burns.max){ 
 		#Start each burn iteration
 		for (n in 1:(burns-1)) {
-			nr.burns[(n+1),,s.inv] = pop_lg(Frs.spp ,nr.burns[n,,], sr.spp,alpha.spp,kd.spp, fkd.yes, kc.spp)[,s.inv]
+			nr.burns[(n+1),,s.inv] = pop_lg(Frs.spp ,nr.burns[n,,], sr.spp,alpha.spp,kd.spp, kc.spp, fkd.yes)[,s.inv]
 
 
 			#Reset invader to low density
@@ -835,6 +837,13 @@ get.fd.cov = function (Fr.spp, sp.ids, nrs.spp, sr.spp, alpha.ir, a_rr, kd.spp, 
 	ls1=length(s_zeta$spec)
 	#Rebuild dispersal kernel to accomodate width
 	xx_pad=matrix(seq(-ls1,ls1))
+
+	lam2 = matrix(0,np,np)
+			#lam2[ceiling(np/2),] = lam2[ceiling(np/2),]+t(as.matrix(lam.tmp))
+			diag(lam2) = as.matrix(lam.tmp)
+			fd2[,,sa]=mvfft(lam2)
+			nr_disp[,sa] = rowSums( Re(mvfft( (fd2[,,sa]*fkd[,,sa]), inverse=T)/(np+1)),na.rm=T	)
+
 	kd.tmp=a_rr/2*exp(-a_rr*abs(xx_pad))
 	kd.tmp=kd.tmp/(sum(kd.tmp))
 	fdc2=fft(fft(kd.tmp[(ls1+2):(ls1+1+ls1)])*fft(s_zeta$spec[1:ls1],inverse=T)/(1-fft(kd.tmp[(ls1+2):(ls1+1+ls1)])), inverse=T)/(4*ls1)
@@ -918,7 +927,7 @@ get.fd.cov2 = function (Fr.spp, sp.ids, nrs.spp, sr.spp, alpha.spp, kd.spp, kc.s
 get.fast.igr = function (Fr.inv, nr.spp, sr,alphas,kd,kc,n.inv){
 
 
-	inv.one =pop_lg(Fr.inv, nr.spp, sr,alphas,kd,kc)[,n.inv]
+	inv.one =pop_lg(Fr.inv, nr.spp, sr,alphas,kd,kc,fkd.yes)[,n.inv]
 	gr1.fast=mean(inv.one)/mean(nr.spp[,n.inv])
 
 	return(gr1.fast)
