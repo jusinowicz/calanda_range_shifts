@@ -9,4 +9,6 @@ This code is based on the coexistence_range_shifts code, but includes several tw
 3. Dispersal kernels that are based on the WALD approach (see code for references) 
 4. Analysis of persistence with dispersal kernels that vary in space (i.e. are per-site dispersal kernels). 
 
+NOTE: calanda_pop_krigALL_prob_wald2.R is the cleaner version of the code, where all of the statistical exploration has been removed. The original file, calanda_pop_krigALL_prob_wald.R, is most useful for looking at the statistical analyses of demographic parameters.  
+
 
