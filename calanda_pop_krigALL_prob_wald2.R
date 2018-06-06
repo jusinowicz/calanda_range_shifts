@@ -130,49 +130,6 @@ for(sp in 1:length(spp)){
 	rr_gams[[sp]]=rr_gam
 }
 
-#Fix the lower-elevation tail of DG and AX (check if this is still necessary): 
-# lt = c(120,100)
-# for (le in 1:2) { 
-# 	nl = min(rr_krig[1:(lt[le]),le])
-# 	nl_min = which(rr_krig[1:(lt[le]),le] == nl )
-# 	#Replace higher values to the left with nl
-# 	rr_krig[1:nl_min,le][ rr_krig[1:nl_min,le] > nl] = nl
-
-# 	#For flower probabilities:
-# 	nl = min(flower_probK[1:(lt[le]),le])
-# 	nl_min = which(flower_probK[1:(lt[le]),le] == nl )
-# 	#Replace higher values to the left with nl
-# 	flower_probK[1:nl_min,le][ flower_probK[1:nl_min,le] > nl] = nl
-# }
-
-# #Tweaking these more so that they don't stay level, but tape exponentially
-# #Species 1:
-# le=1
-# 	infl1 = which(flower_probK[,le] ==max(flower_probK[,le]))
-# 	to_flip = flower_probK[1:infl1]
-
-
-# #Species 2: 
-# le =2 
-# #Exponential taper through inflection points on left side: 
-# 	#point 1: Inflection point 
-# 	infl1 = which(diff(rr_krig[,le]) ==max(diff(rr_krig[,le]))) 
-# 	xe1 = xx[infl1,1]
-# 	ye1 = rr_krig[infl1,le]
-
-# 	#point 2: Minimum
-# 	infl2 = min(which((diff(rr_krig[,2]))>0))
-# 	xe2 = xx[infl2,1]
-# 	ye2 = rr_krig[infl2,le]
-
-# 	ae=1
-
-# 	#Use a log-linear slope to fit the exponential between the two points
-# 	m = (log(ye1)-log(ye2))/(xe1-xe2)
-# 	b = -(xe2*log(ye1)-xe1*log(ye2))/(xe1-xe2)
-
-# 	new_rr = exp(m*xx[,1]+b)
-# 	rr_krig [1:infl2,le] = new_rr[1:infl2]
 
 
 #=============================================================================
@@ -444,7 +401,20 @@ fast.bys=FALSE
 
 
 #Get the WALD kernel based on field measurements
-u_mean = 2.85 #Mean windspeed above canopy
+#Fine the mean windspeed: WARNING, do not do this every time if these files are
+#very large (i.e. >500 MB)!
+#write.csv(stmp,file="bmwind2017s.csv" ) #File with only first 14 columns
+site_files=c("/home/jacob/labshare/Jacob/wind_data/2017/Aurella/arwind2017.csv",
+			"/home/jacob/labshare/Jacob/wind_data/2017/Neselboden/nswind2017.csv",
+			"/home/jacob/labshare/Jacob/wind_data/2017/Barenmos/bmwind2017.csv",
+			"/home/jacob/labshare/Jacob/wind_data/2017/Neusass/newind2017.csv",
+			"/home/jacob/labshare/Jacob/wind_data/2017/Calanda/cawind2017.csv")
+
+u_mean = get.u_mean(site_files, headers=FALSE, col_name = )
+
+u_mean=c(1.157264,1.253033,1.070176, 1.045009, 0)
+u_var = c(0,0.6048379,0.4641298,0.5813984,0 )
+#u_mean = 2.85 #Mean windspeed above canopy
 Vt=c(2.6,3,3.3) #terminal velocity DG maybe 2.6, AX maybe 3, HN maybe 3.3
 
 #Model parameters for the Beta function: Based on Su et al. 2001

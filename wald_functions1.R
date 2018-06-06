@@ -18,13 +18,55 @@
 #=============================================================================
 #Get u_mean
 #=============================================================================
-#This version of the function will interpolate the change in the mean
-#across sites. 
+#This script is useful for concatenating multiple csvs without the headers
+#for f in `ls *.csv`; do sed '2,$!d' $f >> newind2017.csv; done
 #
-# get.u_mean=function(heights, site.list)){
+#This is just a function to load data files and return each site's mean
+#windspeed.  
+#
+# site_list     A vector with the names of the files to load
+# headers       Does the file contain headers? 
+# col_name      If headers = T, 
+#               What is the name of the column with the wind speed? 
+#               If false, what column number? 
 
+ get.u_mean=function(site_files,headers, col_name)){
 
-# }
+  nsites= length(site_files)
+  site_means=matrix(0,nsites,1)
+
+  for(n in 1:nsites){
+    if (headers == TRUE){ 
+      stmp = read.csv(paste(site_files[n]), header=T)
+      #Fix something that happens in the big csv files for unknown reasons
+      #Convert to numeric
+      wsp_tmp=as.numeric(levels(stmp[,6]))[stmp[,6]]
+      #Text converted to NAs
+      wsp_isna = which(is.na(wsp_tmp))
+      #The correct value should be in the previous column
+      wsp_tmp[wsp_isna] = as.numeric(as.character(stmp [wsp_isna,5]))
+      
+      #Now calculate the mean
+      site_means[n] = mean(wsp_tmp)
+
+    } 
+
+    if (headers == FALSE){ 
+      stmp = read.csv(paste(site_files[n]), header=F)
+      #Fix something that happens in the big csv files for unknown reasons
+      #Convert to numeric
+      wsp_tmp=as.numeric(levels(stmp[,6]))[stmp[,6]]
+      #Text converted to NAs
+      wsp_isna = which(is.na(wsp_tmp))
+      #The correct value should be in the previous column
+      wsp_tmp[wsp_isna] = as.numeric(as.character(stmp [wsp_isna,5]))
+      
+      #Now calculate the mean
+      site_means[n] = mean(wsp_tmp)
+
+    }
+
+ }
 
 #=============================================================================
 #Get beta_sum
