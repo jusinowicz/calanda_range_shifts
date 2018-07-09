@@ -19,7 +19,7 @@
 #Get u_mean
 #=============================================================================
 #This script is useful for concatenating multiple csvs without the headers
-#for f in `ls *.csv`; do sed '2,$!d' $f >> newind2017.csv; done
+#for f in `ls *.csv`; do sed '2,$!d' $f >> nehobo.csv; done
 #
 #This is just a function to load data files and return each site's mean
 #windspeed.  

@@ -401,20 +401,24 @@ fast.bys=FALSE
 
 
 #Get the WALD kernel based on field measurements
-#Fine the mean windspeed: WARNING, do not do this every time if these files are
+#Find the mean windspeed: WARNING, do not do this every time if these files are
 #very large (i.e. >500 MB)!
-#write.csv(stmp,file="bmwind2017s.csv" ) #File with only first 14 columns
+#write.csv(stmp,file="nswind2017s.csv" ) #File with only first 14 columns
 site_files=c("/home/jacob/labshare/Jacob/wind_data/2017/Aurella/arwind2017.csv",
 			"/home/jacob/labshare/Jacob/wind_data/2017/Neselboden/nswind2017.csv",
 			"/home/jacob/labshare/Jacob/wind_data/2017/Barenmos/bmwind2017.csv",
 			"/home/jacob/labshare/Jacob/wind_data/2017/Neusass/newind2017.csv",
 			"/home/jacob/labshare/Jacob/wind_data/2017/Calanda/cawind2017.csv")
 
-u_mean = get.u_mean(site_files, headers=FALSE, col_name = )
+#u_mean = get.u_mean(site_files, headers=FALSE, col_name = )
 
-u_mean=c(1.157264,1.253033,1.070176, 1.045009, 0)
-u_var = c(0,0.6048379,0.4641298,0.5813984,0 )
-#u_mean = 2.85 #Mean windspeed above canopy
+#Site-specific means from get.u_mean
+u_mean_sites=c(1.157264,1.253033,1.070176, 1.045009, 2.845403)
+u_var_sites = c(0.5265219,0.6048379,0.4641298,0.5813984,5.014292 )
+
+u_mean=mean(u_mean_sites)
+
+#u_mean = 2.85 #Mean windspeed above canopy NOTE: Old value
 Vt=c(2.6,3,3.3) #terminal velocity DG maybe 2.6, AX maybe 3, HN maybe 3.3
 
 #Model parameters for the Beta function: Based on Su et al. 2001
