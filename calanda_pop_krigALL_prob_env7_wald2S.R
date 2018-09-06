@@ -16,7 +16,7 @@ source("./range_coexistence_functionsWALD.R")
 #=============================================================================
 #For naming files
 #=============================================================================
-f.name1=c("calanda_igr7_multiB_2017")
+f.name1=c("calanda_igr8_multiB_fut_2017")
 #=============================================================================
 #Data: (see alanda2017.R)
 #=============================================================================
@@ -63,31 +63,31 @@ xx$e2 = as.matrix(xx$e2)
 #is not trustworthy for the hobos. 
 
 #Temp
-temp_gam = gam( gs_mean_temp~ s(year,bs="re")+s(elevation,k=5),data=allB)
+temp_gam = gam( gs_mean_temp~ s(year,bs="re")+s(elevation,k=3),data=allB)
 #temp_gam = gam( gs_mean_temp~ s(year,bs="re")+elevation,data=allB)
 
 #soil moisture 
-sm_gam = gam( soil_moist~ s(year,bs="re")+s(elevation,k=5),data=allB)
+sm_gam = gam( soil_moist~ s(year,bs="re")+s(elevation,k=3),data=allB)
 #sm_gam = gam( soil_moist~ s(year,bs="re")+elevation,data=allB)
 
 #PET
-sp_gam = gam( soil_pet~ s(year,bs="re")+s(elevation,k=5),data=allB)
+sp_gam = gam( soil_pet~ s(year,bs="re")+s(elevation,k=3),data=allB)
 #sp_gam = gam( soil_pet~ s(year,bs="re")+elevation,data=allB)
 
 #Moisture deficit
-sd_gam = gam( soil_def~ s(year,bs="re")+s(elevation,k=5),data=allB)
+sd_gam = gam( soil_def~ s(year,bs="re")+s(elevation,k=3),data=allB)
 #sd_gam = gam( soil_def~ s(year,bs="re")+elevation,data=allB)
 
 #annual mean light
-ml_gam = gam( an_mean_light~ s(year,bs="re")+s(elevation,k=5),data=allB)
+ml_gam = gam( an_mean_light~ s(year,bs="re")+s(elevation,k=3),data=allB)
 #ml_gam = gam( an_mean_light~ s(year,bs="re")+elevation,data=allB)
 
 #GDD
-gdd_gam = gam( max_gdd~ s(year,bs="re")+s(elevation,k=5),data=allB)
+gdd_gam = gam( max_gdd~ s(year,bs="re")+s(elevation,k=3),data=allB)
 #gdd_gam = gam( max_gdd~ s(year,bs="re")+elevation,data=allB)
 
 #Minimum growing season temp
-gmt_gam = gam( gs_min_temp~ s(year,bs="re")+s(elevation,k=5),data=allB)
+gmt_gam = gam( gs_min_temp~ s(year,bs="re")+s(elevation,k=3),data=allB)
 #gmt_gam = gam( gs_min_temp~ s(year,bs="re")+elevation,data=allB)
 
 #=============================================================================
@@ -176,7 +176,7 @@ flower_probK=matrix(0,dim(xx)[1], length(spp))
 flower_prob=NULL
 flower_prob_act = matrix(0,5,3)
 
-kn = c(3,5,3)
+kn = c(5,5,5)
 
 for(sp in 1:length(spp)){
 	allsp = subset(allB, Sp == spp[sp])
@@ -188,13 +188,27 @@ for(sp in 1:length(spp)){
 		flower_prob_act[n,sp]= sum(tfp$flyes)/nrow(tfp)}
 
 	#Run different models for species 1, vs 2 and 3
-	if( sp>1) { 
+	if( sp >3) { 
 	#1)
-		flower_ptmp= gam(flyes ~ s(year,bs="re")+s(gs_mean_temp,k=kn[sp])+s(soil_def,k=kn[sp])+s(max_gdd,k=kn[sp])+s(gs_min_temp),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+s(gs_mean_temp,k=kn[sp])+s(soil_def,k=kn[sp])+s(max_gdd,k=kn[sp])+s(gs_min_temp),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+te(gs_mean_temp,soil_def,gs_min_temp),family=binomial(link='logit'),data=rr_dat)
+		flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+te(gs_mean_temp,soil_def,gs_min_temp)+s(max_gdd,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+te(gs_mean_temp,soil_def,gs_min_temp)+s(max_gdd,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(gs_mean_temp,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(soil_def,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(soil_moist,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(max_gdd,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(gs_min_temp),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+s(gs_mean_temp,k=kn[sp])+te(elevation, gs_mean_temp),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(gs_mean_temp,k=kn[sp])+s(elevation,k=kn[sp])+s(gs_min_temp,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(gs_mean_temp,k=kn[sp])+s(soil_def,k=kn[sp])+s(gs_min_temp,k=kn[sp])
+		#		+te(gs_mean_temp,soil_def,gs_min_temp),family=binomial(link='logit'),data=rr_dat)
 
 	} else {
 
 		flower_ptmp= gam(flyes ~ s(year,bs="re")+te(gs_mean_temp,soil_def,gs_min_temp),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(max_gdd,k=kn[sp])+te(gs_mean_temp,soil_def,gs_min_temp),family=binomial(link='logit'),data=rr_dat)
 
 	}
 	
@@ -221,7 +235,7 @@ for(sp in 1:length(spp)){
 
 rr_krig = matrix(0,dim(xx)[1], length(spp))
 rr_gams=NULL
-kn = c(4,4,3)
+kn = c(3,3,3)
 flower_act =matrix(0,5,3)
 
 for(sp in 1:length(spp)){
@@ -252,8 +266,8 @@ for(sp in 1:length(spp)){
 }
 
 ####Intrinsic ranges
-# Frs=array(c(rr_krig*flower_probK),dim=c(ngenst,np,nspp)) 
-# Frs[,,1] = Frs[,,1]*8
+Frs=array(c(rr_krig*flower_probK),dim=c(ngenst,np,nspp)) 
+Frs[,,1] = Frs[,,1]*8*1.5
 
 
 #=============================================================================
