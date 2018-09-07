@@ -13,6 +13,8 @@ calanda_pop_krigALL_prob_wald.R Is the original file that includes the statistic
 
 calanda_pop_krigALL_prob_env7_wald2S.R Builds from the original analyses to try and uncover the main drivers of species intrinsic ranges. It includes a number of additional environmental variables (e.g. mean temp, max/min temp, soil moisture, moisture deficit, GDD, etc.) that have been built into the probabilty and number of flowers which determine the overall intrinsic range.
 
+calanda_pop_krigALL_prob_env8_wald2S.R Is the cleaner version of env7. Each species has a specific model of its intrinsic range that has been selected according to the following criteria: 1) Models are first selected that give a species a closed range, i.e. that reach 0 between the elevations of 0 and 3500m 2) Lowest AIC model is chosen from amongst these. 
+
 range_coexistence_functionsWALD.R This is the heart of the population simulations and the coexistence analyses and includes the main functions for these portions of the analysis. This code corresponds to that in coexistence_range_shifts/range_coexistence_functions.R
 
 wald_functions1.R Functions for calculating the WALD dispersal kernels. See Katul et al. 2005 for the background and analytical description of this approach. These are mechanistic dispersal kernels which account for turbulent updrafts and require detailed knowledge of the windspeed profiles at a site for calculation. 
