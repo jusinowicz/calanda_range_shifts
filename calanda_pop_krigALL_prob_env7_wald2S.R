@@ -36,8 +36,8 @@ iconfig=1 #NUmber of interattions of initial configuration of species
 
 #Spatial scale: Assume that the gradient is from 500m to 2500m in units of 10m
 elevations=c(1000,1400,1600,1800,2000)
-el1=100
-el2=3000
+el1=0
+el2=3500
 
 #Make some internal spatial variables:
 xx1= matrix(seq(el1,el2,1))
@@ -176,7 +176,7 @@ flower_probK=matrix(0,dim(xx)[1], length(spp))
 flower_prob=NULL
 flower_prob_act = matrix(0,5,3)
 
-kn = c(5,5,5)
+kn = c(3,3,3)
 
 for(sp in 1:length(spp)){
 	allsp = subset(allB, Sp == spp[sp])
@@ -207,7 +207,7 @@ for(sp in 1:length(spp)){
 
 	} else {
 
-		flower_ptmp= gam(flyes ~ s(year,bs="re")+te(gs_mean_temp,soil_def,gs_min_temp),family=binomial(link='logit'),data=rr_dat)
+		flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+te(gs_mean_temp,soil_def,gs_min_temp),family=binomial(link='logit'),data=rr_dat)
 		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(max_gdd,k=kn[sp])+te(gs_mean_temp,soil_def,gs_min_temp),family=binomial(link='logit'),data=rr_dat)
 
 	}
