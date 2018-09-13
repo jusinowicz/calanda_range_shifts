@@ -100,11 +100,78 @@ get.lower = function (np, burns, ngens, pks, Ds, D.tol= 3) {
 
 }
 
+#=============================================================================
+#Get the environmental distance for a site between its current and future
+#values. This just takes the multi-variate Euclidean distance for whichever
+#parameters have been used to define the abiotic conditions. 
+#	env1  	current(past) environmental conditions
+#	env2  	future(current) environmental conditions
+#	env.ind columns with variables to use in the environmental distance
+#=============================================================================
+get_env_distance = function (env1,env2,env.ind){
+
+	env1 = env1[,env.ind]
+	env2 = env2[,env.ind]
+
+	#Normalize all variables relative to the baseline environment
+	env1_new = (env1 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T )
+	env2_new = (env2 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T )
+
+	# env1 = (env1)/matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T )
+	# env2 = (env2)/matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T )
+
+
+	env_distance = sqrt(rowSums( (env2_new-env1_new)^2) )
+
+	return(env_distance)
+
+}
+
+#=============================================================================
+#Get the closest analogue to each site based on environmental distance 
+#with the set of all past environments. 
+#	env1  	current(past) environmental conditions
+#	env2  	future(current) environmental conditions
+#	env.ind columns with variables to use in the environmental distance
+#=============================================================================
+get_analogue = function (env1,env2,env.ind){
+
+	env1 = as.matrix(env1[,env.ind])
+	env2 = as.matrix(env2[,env.ind])
+	
+	#Normalize all variables relative to the baseline environment
+	env1_new = (env1 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T )
+	env2_new = (env2 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T )
+
+
+
+	#Normalize all variables by variance
+	# env1_new = (env1 )/(matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T ))
+	# env2_new = (env2 )/(matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T ))
+
+	all_distances = matrix(0,dim(env2)[1],dim(env1)[1] )
+	closest_env = matrix(0,dim(env2)[1],1 )
+	id_closest = matrix(0,dim(env2)[1],1 )	
+	#Get the distances between future site and all past sites 
+	for ( d in 1:dim(env2)[1]){ 
+
+		env2.tmp = matrix(env2_new[d,],dim(env2_new)[1],dim(env2_new)[2],byrow=T)
+		env_distance = sqrt(rowSums( (env2.tmp-env1_new)^2) )
+		all_distances [d,] = env_distance
+		closest_env[d] = min(env_distance)
+		id_closest[d] = which(env_distance == closest_env[d] )
+
+	}
+	
+	analogue = list(all_distances,closest_env,id_closest)
+	return(analogue)
+
+}
+
 
 #=============================================================================
 #Ranges and range shifts 
 #=============================================================================
-
 #Make a species' intrinsic range using a Gaussian distribution. 
 #Variables correspond to: 
 #	Fr	Max height of distribution (max reproduction)
@@ -123,6 +190,7 @@ get.lower = function (np, burns, ngens, pks, Ds, D.tol= 3) {
 #	stc	spatial array with space and time coordinates
 #	burns	time period where distribution is stationary
 #	ngens	time period of change for distribution
+#=============================================================================
 
 make.range=function(Fr, pks, Ds, stc, ngens, burns, fast.by = FALSE, dnwidth=NULL) { 
 
@@ -193,9 +261,11 @@ return(Fr.tmp)
 
 }
 
+#=============================================================================
 #Calculate the population spread rate from an IGR. This is based on
 #the math from Neubert and Caswell 00, but originating with Weinberger 78, 
 #and Kot 92. 
+#=============================================================================
 
 get.spread.rate = function(gr1.fast,a_rr,sr) {
 	u=seq(0,.1,0.0001)
@@ -208,7 +278,11 @@ get.spread.rate = function(gr1.fast,a_rr,sr) {
 	return(cs_all)
 	}
 
+
+#=============================================================================
 #Calculate a new fitness distribution for a single time step. 
+#=============================================================================
+
 get.fast.peak = function(peak.new,Fr,Ds,cs_all,stc,np){
 	peak.new=peak.new+cs_all 
 	max.new=Fr[1]
@@ -237,6 +311,8 @@ get.fast.peak = function(peak.new,Fr,Ds,cs_all,stc,np){
 #	fkd.yes If this is yes, then it is the Fourier transformed kernels being
 #			passed to the function
 #	kc.spp 	Competition kernels
+#=============================================================================
+
 pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, kc.spp,fkd.yes=FALSE){
 
 	Frs.spp = as.matrix(Frs.spp)
@@ -363,7 +439,7 @@ pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, kc.spp,fkd.yes=FALS
 #Multi-species routines
 #=======================#
 
-
+#=============================================================================
 #Get the resident equilibrium densities using simulations. This version does
 #not require any analytical calculations and works for an arbitrary number 
 #of species. 
@@ -387,6 +463,8 @@ pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, kc.spp,fkd.yes=FALS
 #	fast 	If TRUE, the check for equilibrium is switched to a different routine
 #			which is much faster, but potentially less accurate. 
 #	fast.tol Test for equilibrium: how close is slope to 0? Default = 1e-5
+#=============================================================================
+
 #
 get.res.eq = function(Frs.spp,s.index,sr.spp,alpha.spp,kd.spp,  kc.spp,fkd.yes =FALSE,burns=500, burns.max = 10,tol=1,fast=FALSE,fast.tol=1e-5){
 
@@ -447,7 +525,7 @@ get.res.eq = function(Frs.spp,s.index,sr.spp,alpha.spp,kd.spp,  kc.spp,fkd.yes =
 			return( print("Error: Max iterations exceded without reaching equilibrium"))}
 
 }
-
+#============================================================================
 #Get the invader's low-density equilibrium density using simulations. This version does
 #not require any analytical calculations and works for an arbitrary number 
 #of species. 
@@ -472,6 +550,7 @@ get.res.eq = function(Frs.spp,s.index,sr.spp,alpha.spp,kd.spp,  kc.spp,fkd.yes =
 #	fast 	If TRUE, the check for equilibrium is switched to a different routine
 #			which is much faster, but potentially less accurate. 
 #	fast.tol Test for equilibrium: how close is slope to 0? Default = 1e-5
+#=============================================================================
 
 get.inv.ldeq = function(Frs.spp, nr.res,s.inv,sr.spp,alpha.spp,kd.spp,  kc.spp,fkd.yes =FALSE,burns=500, burns.max = 10,tol=1,fast=FALSE,fast.tol=1e-5){
 
@@ -534,7 +613,7 @@ get.inv.ldeq = function(Frs.spp, nr.res,s.inv,sr.spp,alpha.spp,kd.spp,  kc.spp,f
 			return( print("Error: Max iterations exceded without reaching equilibrium"))}
 
 }
-
+#=============================================================================
 #Function to calculate the invader's stationary distribution in multispeces scenarios
 #based on a combination of approximations and simulations. 
 #1D array of sites. 
@@ -545,8 +624,7 @@ get.inv.ldeq = function(Frs.spp, nr.res,s.inv,sr.spp,alpha.spp,kd.spp,  kc.spp,f
 #	alpha.spp Competition coefficients 
 #	kd.spp 	Dispersal kernel
 #	kc.spp 	Interspecific competition kernel
-
-
+#=============================================================================
 get.isd = function(Fr.spp,  nr.spp,s.inv, alpha.spp, sr.spp,kc.spp,kd.spp){
 	np = length(Fr.spp)
 	nres = dim(as.matrix(nr.spp))[2] #Number of species
@@ -629,9 +707,9 @@ get.isd = function(Fr.spp,  nr.spp,s.inv, alpha.spp, sr.spp,kc.spp,kd.spp){
 }
 
 
-#=======================#
+#=============================================================================
 #Pairwise routines
-#=======================#
+#=============================================================================
 #Function to calculate the resident's stationary distribution in the pairwise scenarios
 #based on analytical approximations. 
 #1D array of sites. 
@@ -641,6 +719,7 @@ get.isd = function(Fr.spp,  nr.spp,s.inv, alpha.spp, sr.spp,kc.spp,kd.spp){
 #	alpha.rr Intraspecific competetion of resident 
 #	kd.spp 	Dispersal kernel
 #	kc.spp 	Intraspecific competition kernel
+#=============================================================================
 
 get.rsd.pair = function(Fr.spp,sr.spp,alpha.rr,kd.spp,kc.spp ){
 	np = length(Fr.spp)
@@ -684,6 +763,7 @@ get.rsd.pair = function(Fr.spp,sr.spp,alpha.rr,kd.spp,kc.spp ){
 
 }
 
+#=============================================================================
 #Function to calculate the invader's stationary distribution in the pairwise scenarios
 #based on analytical approximations. 
 #1D array of sites. 
@@ -694,7 +774,7 @@ get.rsd.pair = function(Fr.spp,sr.spp,alpha.rr,kd.spp,kc.spp ){
 #	alpha.ir Interspecific competetion of resident 
 #	kd.spp 	Dispersal kernel
 #	kc.spp 	Interspecific competition kernel
-
+#=============================================================================
 
 get.isd.pair = function(Fr.spp, nr.spp, sr.spp,alpha.ir,kd.spp,kc.spp ){
 	np = length(Fr.spp)
@@ -776,6 +856,7 @@ get.isd.pair = function(Fr.spp, nr.spp, sr.spp,alpha.ir,kd.spp,kc.spp ){
 #Multi-species routines
 #=======================#
 
+#=============================================================================
 #This function is to get the fitness-density covariance for a single
 #1D array of sites, for an arbitrary number of species. It requires 
 #multi-species equilibriums calculated from e.g. simulations. 
@@ -796,6 +877,7 @@ get.isd.pair = function(Fr.spp, nr.spp, sr.spp,alpha.ir,kd.spp,kc.spp ){
 #	kc.spp 	Interspecific competition kernels with residents
 #			-If this matrix is a single column then it is used
 #			-used iteratively/identically across interactions	 
+#=============================================================================
 
 get.fd.cov = function (Fr.spp, sp.ids, nrs.spp, sr.spp, alpha.ir, a_rr, kd.spp, fkd.yes=FALSE, kc.spp){ 
 	
@@ -853,6 +935,7 @@ get.fd.cov = function (Fr.spp, sp.ids, nrs.spp, sr.spp, alpha.ir, a_rr, kd.spp, 
 
 }
 
+#=============================================================================
 #This function is to get the fitness-density covariance for a single
 #1D array of sites, for an arbitrary number of species. This version is
 #based on calculating the invader stationary distribution. It requires 
@@ -871,6 +954,7 @@ get.fd.cov = function (Fr.spp, sp.ids, nrs.spp, sr.spp, alpha.ir, a_rr, kd.spp, 
 #	kc.spp 	Interspecific competition kernels with residents
 #			-If this matrix is a single column then it is used
 #			-used iteratively/identically across interactions	 
+#=============================================================================
 
 get.fd.cov2 = function (Fr.spp, sp.ids, nrs.spp, sr.spp, alpha.spp, kd.spp, kc.spp){ 
 	
