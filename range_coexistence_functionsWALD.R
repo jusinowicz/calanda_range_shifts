@@ -7,6 +7,23 @@
 # parameter. 
 #
 # Dispersal kernels are allowed to vary in space and be location-specific
+#
+# The functions are broken into 3 sections: 
+# 1. Miscellanerous functions: Mostly helper functions for later routines.
+#		Also some functions to set up theoretical intrinsic ranges for 
+#		simulations. 
+# 2. Invader and resident equilibrium densities: Functions to calculate 
+#		components of the Low-density growth rates (LGR) in various ways
+#		(including both analytical and numerical approaches).
+#		Two subsections: 1) Multispecies (full community) case and 2) Pairwise
+#		case. 
+# 3. Environmental distance and site-LGR impact: Functions to determine 1)
+#		1) the environmental distance between a site's current and future state
+#		(environmental distance is the Euclidean distance in the multivariate
+#		abiotic space), and its environmental/physical distance from the 
+#		nearest analogue and, 
+#		2) the incluence that each site has on the various LGR metrics of (2)
+#
 #=============================================================================
 
 
@@ -97,74 +114,6 @@ get.lower = function (np, burns, ngens, pks, Ds, D.tol= 3) {
 	
 		sds.low=round(np/2)+peak.stc-sqrt(Ds.stc)*D.tol
 		return(sds.low)
-
-}
-
-#=============================================================================
-#Get the environmental distance for a site between its current and future
-#values. This just takes the multi-variate Euclidean distance for whichever
-#parameters have been used to define the abiotic conditions. 
-#	env1  	current(past) environmental conditions
-#	env2  	future(current) environmental conditions
-#	env.ind columns with variables to use in the environmental distance
-#=============================================================================
-get_env_distance = function (env1,env2,env.ind){
-
-	env1 = env1[,env.ind]
-	env2 = env2[,env.ind]
-
-	#Normalize all variables relative to the baseline environment
-	env1_new = (env1 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T )
-	env2_new = (env2 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T )
-
-	# env1 = (env1)/matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T )
-	# env2 = (env2)/matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T )
-
-
-	env_distance = sqrt(rowSums( (env2_new-env1_new)^2) )
-
-	return(env_distance)
-
-}
-
-#=============================================================================
-#Get the closest analogue to each site based on environmental distance 
-#with the set of all past environments. 
-#	env1  	current(past) environmental conditions
-#	env2  	future(current) environmental conditions
-#	env.ind columns with variables to use in the environmental distance
-#=============================================================================
-get_analogue = function (env1,env2,env.ind){
-
-	env1 = as.matrix(env1[,env.ind])
-	env2 = as.matrix(env2[,env.ind])
-	
-	#Normalize all variables relative to the baseline environment
-	env1_new = (env1 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T )
-	env2_new = (env2 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T )
-
-
-
-	#Normalize all variables by variance
-	# env1_new = (env1 )/(matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T ))
-	# env2_new = (env2 )/(matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T ))
-
-	all_distances = matrix(0,dim(env2)[1],dim(env1)[1] )
-	closest_env = matrix(0,dim(env2)[1],1 )
-	id_closest = matrix(0,dim(env2)[1],1 )	
-	#Get the distances between future site and all past sites 
-	for ( d in 1:dim(env2)[1]){ 
-
-		env2.tmp = matrix(env2_new[d,],dim(env2_new)[1],dim(env2_new)[2],byrow=T)
-		env_distance = sqrt(rowSums( (env2.tmp-env1_new)^2) )
-		all_distances [d,] = env_distance
-		closest_env[d] = min(env_distance)
-		id_closest[d] = which(env_distance == closest_env[d] )
-
-	}
-	
-	analogue = list(all_distances,closest_env,id_closest)
-	return(analogue)
 
 }
 
@@ -319,6 +268,7 @@ pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, kc.spp,fkd.yes=FALS
 	np = dim(as.matrix(Frs.spp))[1] #Space
 	nspp = dim(as.matrix(Frs.spp))[2] #Number of species
 	
+
 	#Check the dimensionality of the dispersal kernel. If it is a spatially 
 	#heteroeneous dispersal kernel, then set het_kern=1
 
@@ -362,6 +312,7 @@ pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, kc.spp,fkd.yes=FALS
 	} else {
 
 		fkd = kd.spp
+		fkc = kc.spp
 	}
 
 
@@ -379,10 +330,20 @@ pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, kc.spp,fkd.yes=FALS
 	cr_tot = matrix(0,np,nspp)
 		for (sa in 1:nspp) { 
 			for (sb in 1:nspp) {
+				
+
 					cr[,(sa*(sa-1)+sb)] = Re(fft((alpha.spp[sa,sb]*fp[,sb]*fkc[,sb]),
 						inverse=T)/(np+1))
-					cr[,(sa*(sa-1)+sb)] = c(cr[(ceiling(np/2):(np)),(sa*(sa-1)+sb)], 
-						cr[(1:floor(np/2)),(sa*(sa-1)+sb)])
+
+					#This if/else makes the code more robust to odd/even spatial extent
+					if(ceiling(np/2) == floor (np/2) ){
+						cr[,(sa*(sa-1)+sb)] = c(cr[((ceiling(np/2)+1):(np)),(sa*(sa-1)+sb)], 
+							cr[(1:floor(np/2)),(sa*(sa-1)+sb)])
+					}else {
+						cr[,(sa*(sa-1)+sb)] = c(cr[(ceiling(np/2):(np)),(sa*(sa-1)+sb)], 
+							cr[(1:floor(np/2)),(sa*(sa-1)+sb)])
+					}
+
 					cr_tot[,sa] = cr_tot[,sa] + cr[ ,(sa*(sa-1)+sb)]	
 			}
 		}
@@ -420,7 +381,12 @@ pop_lg = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, kc.spp,fkd.yes=FALS
 			nr_disp[,sa] = Re(fft( (fd[,sa]*fkd[,sa]), inverse=T)/(np+1))
 		}
 
-		nr_disp[,sa] = c(nr_disp[(ceiling(np/2):(np)),sa],nr_disp[(1:floor(np/2)),sa])
+		#This if/else makes the code more robust to odd/even spatial extent
+		if(ceiling(np/2) == floor (np/2) ){
+			nr_disp[,sa] = c(nr_disp[((ceiling(np/2)+1):(np)),sa],nr_disp[(1:floor(np/2)),sa])
+		}else {
+			nr_disp[,sa] = c(nr_disp[(ceiling(np/2):(np)),sa],nr_disp[(1:floor(np/2)),sa])
+		}
 		
 		#Final population step
 		nr.burns[2,,sa] = nr_disp[,sa] + nr.burns[1,,sa]*sr[sa]
@@ -1107,3 +1073,146 @@ get.fd.cov.p2 = function (Fr.spp,nr.spp, sr.spp,alpha.ir,kd.spp,kc.spp ){
 
 
 
+
+#=============================================================================
+#Environmental distance and site-LGR impact
+#=============================================================================
+
+#=============================================================================
+#Get the environmental distance for a site between its current and future
+#values. This just takes the multi-variate Euclidean distance for whichever
+#parameters have been used to define the abiotic conditions. 
+#	env1  	current(past) environmental conditions
+#	env2  	future(current) environmental conditions
+#	env.ind columns with variables to use in the environmental distance
+#=============================================================================
+get_env_distance = function (env1,env2,env.ind){
+
+	env1 = env1[,env.ind]
+	env2 = env2[,env.ind]
+
+	#Normalize all variables relative to the baseline environment
+	env1_new = (env1 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(sqrt(apply(env1,2,var)),dim(env1)[1],dim(env1)[2],byrow=T )
+	env2_new = (env2 - matrix(colMeans(env2),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(sqrt(apply(env2,2,var)),dim(env2)[1],dim(env2)[2],byrow=T )
+
+	# env1 = (env1)/matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T )
+	# env2 = (env2)/matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T )
+
+
+	env_distance = sqrt(rowSums( (env2_new-env1_new)^2) )
+
+	return(env_distance)
+
+}
+
+#=============================================================================
+#Get the closest analogue to each site based on environmental distance 
+#with the set of all past environments. 
+#	env1  	current(past) environmental conditions
+#	env2  	future(current) environmental conditions
+#	env.ind columns with variables to use in the environmental distance
+#=============================================================================
+get_analogue = function (env1,env2,env.ind){
+
+	env1 = as.matrix(env1[,env.ind])
+	env2 = as.matrix(env2[,env.ind])
+	
+	#Normalize all variables relative to the baseline environment
+	env1_new = (env1 - matrix(colMeans(env1),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(sqrt(apply(env1,2,var)),dim(env1)[1],dim(env1)[2],byrow=T )
+	env2_new = (env2 - matrix(colMeans(env2),dim(env1)[1],dim(env1)[2],byrow=T ))/matrix(sqrt(apply(env2,2,var)),dim(env2)[1],dim(env2)[2],byrow=T )
+
+
+	#Normalize all variables by variance
+	# env1_new = (env1 )/(matrix(apply(env1,2,var),dim(env1)[1],dim(env1)[2],byrow=T ))
+	# env2_new = (env2 )/(matrix(apply(env2,2,var),dim(env2)[1],dim(env2)[2],byrow=T ))
+
+	#Distance between a site in variable env2 and all sites in env1
+	all_distances = matrix(0,dim(env2)[1],dim(env1)[1] )
+	#Find the minimum distance between env1 and env2
+	closest_env = matrix(0,dim(env2)[1],1 )
+	#The site ID of the closest environmental conditions
+	id_closest = matrix(0,dim(env2)[1],1 )	
+	#Proportion of the distance that each variable in env.ind contributes to minimum distance
+	#all_var_distance = array(matrix(0,dim(env2)[1],dim(env1)[1] ), dim=(dim(env2)[1],dim(env1)[1], length(env.ind)))
+	all_var_distance =matrix(0,dim(env2)[1],length(env.ind) )
+	
+
+	#Get the distances between future site and all past sites 
+	for ( d in 1:dim(env2)[1]){ 
+
+		env2.tmp = matrix(env2_new[d,],dim(env2_new)[1],dim(env2_new)[2],byrow=T)
+		var_distances = (env2.tmp-env1_new)^2
+		env_distance = sqrt(rowSums( var_distances ) )
+		all_distances [d,] = env_distance 
+		closest_env[d] = min(env_distance)
+		id_closest[d] = which(env_distance == closest_env[d] )
+		all_var_distance[d,] = var_distances[id_closest[d],]/(sum(var_distances[id_closest[d],]))
+
+	}
+	
+	analogue = list(all_distances,closest_env,id_closest,all_var_distance)
+	return(analogue)
+
+}
+
+#=============================================================================
+# site_impact_sim()
+# Use the simulation measurement of LGR to find site impact. Code just
+# iteratively removes each site and recalculates LGR. 
+#	Uses function pop_lg()
+#	ngenst  The total number of environmental-change timesteps to do the calc
+# 			for	
+#	sp.ids 	The numerical IDs of species (positions in the matrix), with invader
+# 			listed first
+#=============================================================================
+site_impact_sim = function (Frs.spp,nr.spp, sr.spp,alpha.spp, kd.spp, kc.spp, fkd.yes=FALSE,ngenst,sp.ids){
+	
+	np = dim(as.matrix(Frs.spp))[1] #Space
+	nspp = dim(as.matrix(Frs.spp))[2] #Number of species
+	site.impacts = matrix(0,np,1)
+
+	for (ss in 1:np){
+
+		Frs.spp.n = Frs.spp[-ss,]
+		nr.spp.n = nr.spp[-ss,]
+
+		#If the dispersal kernel is site specific then it will have a dim()[3]
+		#Otherwise, it is a normal (not a function of spatial location) kernel
+		if (!is.na(dim(kd.spp)[3])){ 
+			kd.spp.n = kd.spp[,-ss,]
+		}else{
+			kd.spp.n = kd.spp[-ss,]
+		}
+		#Simple numerical LDG: use the invader low-density equilibrium density, 
+		#then let it invade against the community: 
+
+		inv.one =pop_lg(Frs.spp.n, nr.spp.n, sr.spp, alpha.spp, kd.spp.n, kc.spp, fkd.yes )[,s]
+		site.impacts[ss]=mean(inv.one)/mean(nr.spp.n[,sp.ids[1]])
+		if(ss%%ceiling(np/100)==0) {print(ss)}
+	}
+
+	return(site.impacts)
+
+}
+
+
+# # source("./range_coexistence_functionsWALD.R")
+# Frs.spp = Frs[t,,]
+# nr.spp =nr[t,,]
+# sr.spp =sr
+# alpha.spp =alphas
+# kd.spp = fkd.n
+# kc.spp = fkc.n
+
+# kd.spp=kdg
+# kc.spp = kc.n
+# nr.spp =nr2[t,,]
+
+# Frs.spp=Frs.spp.n
+# nr.spp = nr.spp.n
+# kd.spp=kd.spp.n
+
+# Frs.spp=Frs[t,,]
+# nr.spp=nr[t,,]
+# kd.spp=fkd
+# kc.spp=fkc
