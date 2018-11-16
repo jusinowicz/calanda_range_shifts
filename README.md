@@ -9,6 +9,8 @@ This code is based on the coexistence_range_shifts code from an earlier reposito
 3. Dispersal kernels that are based on the WALD approach (see code for references) 
 4. Analysis of persistence with dispersal kernels that vary in space (i.e. are per-site dispersal kernels). 
 
+calanda_figures3.R Code to produce plots of intrinsic ranges, environmental novelty, and the spatial LGR and its components. 
+
 calanda_pop_krigALL_prob_wald.R Is the original file that includes the statistical explorations of models (including tests for effects of plant size -- as in an Integral Projection Modeling (IPM) approach), simulations of population dynamics, and analysis of spatial coexistence mechanisms. 
 
 calanda_pop_krigALL_prob_env7_wald2S.R Builds from the original analyses to try and uncover the main drivers of species intrinsic ranges. It includes a number of additional environmental variables (e.g. mean temp, max/min temp, soil moisture, moisture deficit, GDD, etc.) that have been built into the probabilty and number of flowers which determine the overall intrinsic range.
