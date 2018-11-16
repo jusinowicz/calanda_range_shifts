@@ -9,6 +9,7 @@
 library(mgcv)
 library(MASS)
 library(fields)
+library(viridis)
 source("./wald_functions1.R")
 source("./range_coexistence_functionsWALD.R")
 #source("./range_coexistence_functionsD.R") #The old library
@@ -165,12 +166,7 @@ env_distance = get_env_distance(xx,xx_new,env.ind)
 env_analogue = get_analogue(xx,xx_new,env.ind)
 var_dist = env_analogue[[4]]
 colnames(var_dist)=colnames(xx)[env.ind]
-
-#image.plot(x=xx$elevation, y = 1:(length(env.ind)+1), cbind(env_analogue[[2]],var_dist), yaxt='n')
-image.plot(x=xx$elevation, y = 1:(length(env.ind)+1), cbind(env_analogue[[2]],max(env_analogue[[2]])*var_dist), yaxt='n')
-axis(2, at=1:(length(env.ind)+1), labels = c("total",colnames(var_dist)),cex.axis=0.8)
-
-
+an_dist = sqrt( (env_analogue[[3]] - xx_new$elevation)^2)
 
 #=============================================================================
 #FLOWERS
