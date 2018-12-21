@@ -9,13 +9,15 @@ This code is based on the coexistence_range_shifts code from an earlier reposito
 3. Dispersal kernels that are based on the WALD approach (see code for references) 
 4. Analysis of persistence with dispersal kernels that vary in space (i.e. are per-site dispersal kernels). 
 
-calanda_figures3.R Code to produce plots of intrinsic ranges, environmental novelty, and the spatial LGR and its components. 
+calanda_pop_prob_env12_wald2.R Gives results for incrememntal environmental change. These include changes in intrinsic range from the fit distributions, changes in realized range, changes in the low-density equilibrium density, and the spatial components of the low-density growth rate. See calanda_figures4.R for code to produce figures. 
 
 calanda_pop_krigALL_prob_wald.R Is the original file that includes the statistical explorations of models (including tests for effects of plant size -- as in an Integral Projection Modeling (IPM) approach), simulations of population dynamics, and analysis of spatial coexistence mechanisms. 
 
 calanda_pop_krigALL_prob_env7_wald2S.R Builds from the original analyses to try and uncover the main drivers of species intrinsic ranges. It includes a number of additional environmental variables (e.g. mean temp, max/min temp, soil moisture, moisture deficit, GDD, etc.) that have been built into the probabilty and number of flowers which determine the overall intrinsic range.
 
 calanda_pop_krigALL_prob_env10_wald2.R Is the cleaner version of env7. Each species has a specific model of its intrinsic range that has been selected according to the following criteria: 1) Models are first selected that give a species a closed range, i.e. that reach 0 between the elevations of 0 and 3500m 2) Lowest AIC model is chosen from amongst these. 
+
+calanda_figures4.R Code to produce plots of intrinsic ranges, environmental novelty, and the spatial LGR and its components (using data generated from . 
 
 range_coexistence_functionsWALD.R This is the heart of the population simulations and the coexistence analyses and includes the main functions for these portions of the analysis. This code corresponds to that in coexistence_range_shifts/range_coexistence_functions.R
 
