@@ -17,7 +17,7 @@ source("./range_coexistence_functionsWALD.R")
 #=============================================================================
 #For naming files
 #=============================================================================
-f.name1=c("calanda_igrsites12it2_multi_2017")
+f.name1=c("calanda_igrsites12it3_multi_2017")
 #=============================================================================
 #Data: (see calanda2017.R)
 #=============================================================================
@@ -32,7 +32,7 @@ allB$year=as.numeric(allB$year)
 #Tunable lattice parameters (space and time)
 #=============================================================================
 mstart = 0
-mstop = 5
+mstop = 6
 minc = 0.5
 mtot= ceiling((mstop-mstart)/minc)
 
@@ -433,7 +433,7 @@ b_rr=c(.1,.1,.1) #10 cm plots
 ###Dispersal distance -- These are calculated using the WALD model --see 
 #wald_model1.R
 
-#a_rr=1/(100*np) #essentially global
+#a_rr= c(1/(100*np),1/(100*np),1/(100*np) #essentially global
 #a_rr=c(1/50,1/50,1/50)
 #Set the means (for an exponential) to what they are in the WALD kernel below 
 
@@ -450,21 +450,121 @@ stc=array(c(matrix(stc.temp$x,ngenst,np,byrow=T),matrix(stc.temp$y,ngenst,np,byr
 # and stc[,,2] is space. stc[,,1] is the same as the column vector 1:ngenst repeated over np columns. Then
 # stc[,,2] is space as a row vector (xx) repeated over ngenst rows. 
 
+
+#=============================================================================
+#dispersal
+#=============================================================================
+#-- this section includes data exploration across elevations and an effect of 
+# elevation on dispersal via the height
+#=============================================================================
+#Krig a distribution of heights as a function of background type
+#Use only those that have flowered
+
+#Height in the bare soil (intrinsic)
+height_krig = matrix(0,dim(xx)[1], length(spp))
+height_gams=NULL
+kn = c(5,5,5)
+for(sp in 1:length(spp)){
+	allsp = subset(allB, Sp == spp[sp])
+	ht_dat_bg =subset(allsp, bg =='B')
+	ht_dat =subset(ht_dat_bg, flyes ==1)
+	ht_gam = gam(stalk.height~s(year,bs="re")+s(elevation,k=kn[sp]), data=ht_dat)
+	
+	#ht_dat =subset(allsp, flyes ==1)	
+	#ht_gam = gam(stalk.height~bg+s(year,bs="re")+s(elevation,k=kn[sp]), data=ht_dat)
+	
+	ht_tmp=as.vector(predict.gam(ht_gam, newdata=xx,type= "response"))
+	#Remove 0s
+	ht_tmp[ht_tmp<0] = 0
+	height_krig[,sp] = ht_tmp
+	height_gams[[sp]]=ht_gam
+}
+
+
+
+#Height as a function of background type -- The statistical models don't 
+#seem to support this as a signficant effect (whether because of sufficient data
+#is unclear)
+
 ####Dispersal kernels and their Fourier transforms 
 
 fast.bys=FALSE
 
-kd=matrix(0,np,nspp)
-fkd=matrix(0,np,nspp)
+#Get the WALD kernel based on field measurements
+#Find the mean windspeed: WARNING, do not do this every time if these files are
+#very large (i.e. >500 MB)!
+#write.csv(stmp,file="nswind2017s.csv" ) #File with only first 14 columns
+# site_files=c("/home/jacob/labshare/Jacob/wind_data/2017/Aurella/arwind2017.csv",
+# 			"/home/jacob/labshare/Jacob/wind_data/2017/Neselboden/nswind2017.csv",
+# 			"/home/jacob/labshare/Jacob/wind_data/2017/Barenmos/bmwind2017.csv",
+# 			"/home/jacob/labshare/Jacob/wind_data/2017/Neusass/newind2017.csv",
+# 			"/home/jacob/labshare/Jacob/wind_data/2017/Calanda/cawind2017.csv")
 
-#Delta function kernel
+#u_mean = get.u_mean(site_files, headers=FALSE, col_name = )
+
+#Site-specific means from get.u_mean
+u_mean_sites=c(1.157264,1.253033,1.070176, 1.045009, 2.845403)
+u_var_sites = c(0.5265219,0.6048379,0.4641298,0.5813984,5.014292 )
+
+u_mean=mean(u_mean_sites)
+
+#u_mean = 2.85 #Mean windspeed above canopy NOTE: Old value
+Vt=c(2.6,3,3.3) #terminal velocity DG maybe 2.6, AX maybe 3, HN maybe 3.3
+
+#Model parameters for the Beta function: Based on Su et al. 2001
+a1=1.05
+a2=2
+a3=0.1
+
+kd=array(c(matrix(0,np,np),matrix(0,np,np)),dim=c(np,np,nspp)) 
+fkd=kd
+
+wald.list = NULL
 for( s in 1:nspp){ 
-	kd[ceiling(np/2) ,s] = 1
-	fkd[,s]=fft(kd[,s])#/(np+1)
-	fkd.yes = TRUE #Pass the transformed kd to functions later for speed
+
+	#This version just uses the average height
+	height_k2 = matrix(c(colMeans(height_krig)),np,nspp, byrow=T)
+
+
+	#The variable wald.list[[s]] will contain a list with: 
+	#site.kernels[[1]][[1]]		the dispersal kernel
+	#site.kernels[[1]][[2]]		the mean dispersal distance
+	#site.kernels[[1]][[3]]		the 90th percentile distance 
+
+	#Pick version of height for kernel:
+	#Variable height
+	#wald.list[[s]] = get.WALD.kernel(u_mean, xx0, height_krig[,s]/100, Vt[s],a1,a2,a3 )[[1]][[1]]
+
+	#Mean height
+	wald.list[[s]] = get.WALD.kernel(u_mean, xx0, height_k2[,s]/100, Vt[s],a1,a2,a3 )[[1]][[1]]
+
+	kd[2:ceiling(np/2),,s] = wald.list[[s]][floor(np/2):1,]
+	kd[ceiling(np/2):(np-1),,s] = wald.list[[s]][1:floor(np/2),]
+
+
+	#Normalize again. 
+	#Because get.WALD.kernel normalizes the right half of the kernel to 1
+	kd[,,s]=kd[,,s]/matrix(colSums(kd[,,s],na.rm=T),np,np,byrow=T)
+	kd[,,s][is.na(kd[,,s])] = 0
+
+	#FFT
+	fkd[,,s]=mvfft(kd[,,s])#/(np+1)
+	fkd.yes=TRUE #Pass the transformed kd to functions later for speed
+
 }
 
+#Need these for testing the effect of each site on LGR later on
+kd.n = kd[-np,,]
+fkd.n = kd.n
+for (sa in 1:nspp) {fkd.n[,,sa]=mvfft(kd.n[,,sa]) }
+
+#Set the means (for an exponential) to what they are in the WALD kernel: 
+a_rr = c(1/wald.list[[1]][[2]],1/wald.list[[2]][[2]],1/wald.list[[3]][[2]])
+
 #Exponential kernel
+# kd=matrix(0,np,nspp)
+# fkd=matrix(0,np,nspp)
+
 # for( s in 1:nspp){ 
 # 	kd[,s] = a_rr[s]/2*exp(-a_rr[s]*abs(xx0))
 # 	kd[,s]=kd[,s]/(sum(kd[,s]))
@@ -474,23 +574,37 @@ for( s in 1:nspp){
 # }
 
 
+# kd=matrix(0,np,nspp)
+# fkd=matrix(0,np,nspp)
+
+# #Delta function kernel
+# for( s in 1:nspp){ 
+# 	kd[ceiling(np/2) ,s] = 1
+# 	fkd[,s]=fft(kd[,s])#/(np+1)
+# 	fkd.yes = TRUE #Pass the transformed kd to functions later for speed
+# }
+
+
 ####Competition kernels and their Fourier transforms 
-kc=matrix(0,np,nspp)
-fkc=matrix(0,np,nspp)
-#Delta function kernel
-for( s in 1:nspp){ 
-	kc[ceiling(np/2) ,s] = 1
-	fkc[,s]=fft(kc[,s])#/(np+1)
-	
-}
 
 #Exponential
+kc=matrix(0,np,nspp)
+fkc=matrix(0,np,nspp)
+for( s in 1:nspp){ 
+	kc[,s] = b_rr[s]/2*exp(-b_rr[s]*abs(xx0))
+	kc[,s]=kc[,s]/(sum(kc[,s]))
+	fkc[,s]=fft(kc[,s])#/(np+1)
+}
+
+#Delta function
+# kc=matrix(0,np,nspp)
+# fkc=matrix(0,np,nspp)
+# #Delta function kernel
 # for( s in 1:nspp){ 
-# 	kc[,s] = b_rr[s]/2*exp(-b_rr[s]*abs(xx0))
-# 	kc[,s]=kc[,s]/(sum(kc[,s]))
+# 	kc[ceiling(np/2) ,s] = 1
 # 	fkc[,s]=fft(kc[,s])#/(np+1)
-# }
 	
+# }
 
 #=============================================================================
 # Key variables for output: the invasion growth rates, their components
@@ -692,6 +806,7 @@ for( t in 1: ngenst){
 	#=============================================================================
 
 	s.index1= 1:nspp
+	burns=1000
 	#Equilibrium populations of all spp. Columns represent space, rows are time. 
 	nf.tmp=array(c(matrix(0.0,burns,np),matrix(0.0,burns,np)),dim=c(burns,np,nspp)) 
 	for ( sa in 1:nspp) { nf.tmp[1,,sa] = matrix(0.01,1,np)}
@@ -702,7 +817,7 @@ for( t in 1: ngenst){
 
 	while (tcomp == 0 ){
 
-		nf.tmp[ts+1,,] = pop_lg(Frs[1,,], nf.tmp[ts,,], sr,alphas, fkd, fkc,fkd.yes  )
+		nf.tmp[ts+1,,] = pop_lg(Frs[t,,], nf.tmp[ts,,], sr,alphas, fkd, fkc,fkd.yes  )
 		
 		#Test for stationarity of community
 		#if ( (mean(mean(nf[(ts+1),,]/nf[(ts),,]))-1) <= comp_thresh){ tcomp=1; is.final=T}
@@ -726,57 +841,12 @@ for( t in 1: ngenst){
 
 		s.index = s.index1[-s]
 
-		#If the "FAST" scenario is chosen, need to do a special set of 
-		#calculations of the invader.
-		if(fast.bys==TRUE ){   
-			#Declare new variables for range 
-
-
-			if (t==(iconfig)){
-				#Remake the range of fast species
-				if ( sum(peaks[1]-peaks.end[1]) != 0 ) { 
-				pks = c( peaks[1], peaks.end[1], peaks.by[1]) } else {
-				pks = peaks[1]} 
-
-				if ( sum(Ds[1]-Ds.end[1]) != 0) { 
-				Ds.tmp = c( Ds[1], Ds.end[1], Ds.by[1]) } else {
-				Ds.tmp = Ds[1]} 
-				
-				Frs[,,1] = make.range(Fr[1], pks, Ds.tmp, stc, ngens, iconfig, fast.bys,dnwidth)
-				#Declare new variables for range 
-				peak.new=which(nr[(t-1),,s] == max(nr[(t-1),,s]),arr.ind=T)-floor(np/2)
-				Fr.inv=Frs[,,1]		
-				print(t)
-			} 
-
-			if (t >(iconfig)){
-				#Calculate the IGR for species 1 for only this time step
-				gr1.fast=get.fast.igr(Frs[(t-1),,],nr[(t-1),,], sr, alphas, kd,kc,n.inv=1 )
-				#Now use the IGR to calculate the spread rate
-				cs_all = get.spread.rate(gr1.fast,a_rr,sr)	
-
-				# Make the new intrinsic fitness distribution for the next timestep
-				# First, make a "pretend" fitness distribution based on how far 
-				# the population of the invader can spread in a single time step
-				Fr.inv[t,] = get.fast.peak(peak.new,Fr,Ds,cs_all,stc[(t-1),,],np)
-				# Then filter the actual intrinsic range according to the amount 
-				# of overlap
-				Frs[t,,1] = Frs[t,,1]*as.numeric(Fr.inv[t,]>1e-2) 
-				#Frs[t,,1] = pmin(Frs[t,,1],Fr.inv[t,])
-				peak.new=peak.new+cs_all
-				print(t)
-
-			}
-		}else{
-
-			#Get the equilibrium of the resident community when invader is absent
-			nr[t,,(s.index)] = get.res.eq(Frs[t,,],s.index,sr,alphas, fkd,fkc, fkd.yes,fast=TRUE, burns = 5 )
-		
-			#Get the low-density equilibrium density of the invader against the resident community
-			nr[t,,s] = get.inv.ldeq(Frs[t,,], nr[t,,], s, sr,alphas, fkd, fkc,fkd.yes,fast=TRUE, burns = 5 )
-			lded [t,,s] = nr[t,,s]
-
-		}
+		#Get the equilibrium of the resident community when invader is absent
+		nr[t,,(s.index)] = get.res.eq(Frs[t,,],s.index,sr,alphas, fkd,fkc, fkd.yes,fast=TRUE, burns = 5 )
+	
+		#Get the low-density equilibrium density of the invader against the resident community
+		nr[t,,s] = get.inv.ldeq(Frs[t,,], nr[t,,], s, sr,alphas, fkd, fkc,fkd.yes,fast=TRUE, burns = 5 )
+		lded [t,,s] = nr[t,,s]
 	
 		#=============================================================================
 		# Low-density growth rates -- using simulation data, all 3 spp
