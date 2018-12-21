@@ -16,7 +16,7 @@ source("./range_coexistence_functionsWALD.R")
 #=============================================================================
 #For naming files
 #=============================================================================
-f.name1=c("calanda_igr8_multiB_fut_2017")
+#f.name1=c("calanda_igr8_multiB_fut_2017")
 #=============================================================================
 #Data: (see alanda2017.R)
 #=============================================================================
@@ -176,7 +176,7 @@ flower_probK=matrix(0,dim(xx)[1], length(spp))
 flower_prob=NULL
 flower_prob_act = matrix(0,5,3)
 
-kn = c(3,3,3)
+kn = c(5,5,5)
 
 for(sp in 1:length(spp)){
 	allsp = subset(allB, Sp == spp[sp])
@@ -188,11 +188,11 @@ for(sp in 1:length(spp)){
 		flower_prob_act[n,sp]= sum(tfp$flyes)/nrow(tfp)}
 
 	#Run different models for species 1, vs 2 and 3
-	if( sp >3) { 
+	if( sp >1) { 
 	#1)
-		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+s(gs_mean_temp,k=kn[sp])+s(soil_def,k=kn[sp])+s(max_gdd,k=kn[sp])+s(gs_min_temp),family=binomial(link='logit'),data=rr_dat)
+		flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+s(gs_mean_temp,k=kn[sp])+s(soil_def,k=kn[sp])+s(max_gdd,k=kn[sp])+s(gs_min_temp),family=binomial(link='logit'),data=rr_dat)
 		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+te(gs_mean_temp,soil_def,gs_min_temp),family=binomial(link='logit'),data=rr_dat)
-		flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+te(gs_mean_temp,soil_def,gs_min_temp)+s(max_gdd,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
+		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp])+te(gs_mean_temp,soil_def,gs_min_temp)+s(max_gdd,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
 		#flower_ptmp= gam(flyes ~ s(year,bs="re")+te(gs_mean_temp,soil_def,gs_min_temp)+s(max_gdd,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
 		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(elevation,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
 		#flower_ptmp= gam(flyes ~ s(year,bs="re")+s(gs_mean_temp,k=kn[sp]),family=binomial(link='logit'),data=rr_dat)
