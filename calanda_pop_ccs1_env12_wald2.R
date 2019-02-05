@@ -1,19 +1,7 @@
 #=============================================================================
-# R code for simulating species range shifts and calculating the strength of 
-# coexistence between competitors. This code is based on the 
-# coexistence_range_shifts code from an earlier repository, which means that 
-# the underlying population dynamics are still modeled with a spatially explicit
-# Leslie-Gower function. But the new code includes severa changes/additions 
-# including:
-#
-# 1. Reproduction is a function of two processes that are both a function of 
-# 	spatial location: probability of flowering, total flowers 
-# 2. GAMs fit to abiotic covariates of elevation, i.e. mean temp, min temp, 
-#    GDD, and soil moisture. 
-# 3. Kriging of intrinsic ranges based on the GAM statistical fits.
-# 4. Dispersal kernels that are based on the WALD approach (see code for references)
-# 5. Analysis of persistence with dispersal kernels that vary in space 
-# 	(i.e. are per-site dispersal kernels).
+# In this version, fit probability of flowering and survival by size class. 
+# Fit the parameters only to plants that have survived. 
+# Fit reproduction only to those that have flowered. 
 #=============================================================================
 #=============================================================================
 # Load these libraries
@@ -29,7 +17,8 @@ source("./range_coexistence_functionsWALD.R")
 #=============================================================================
 #For naming files
 #=============================================================================
-f.name1=c("calanda_igrsites12it3_nfonly2_2017")
+f.name1=c("calanda_igrsites12it_rcp85_multi_2017")
+#f.name1=c("calanda_igrsites12it_rcp26_multi_2017")
 #=============================================================================
 #Data: (see calanda2017.R)
 #=============================================================================
@@ -41,31 +30,35 @@ allB$year=as.numeric(allB$year)
 # allB[ as.numeric(rownames(subset(allB,Sp =="DG") )), ]$nr.inflor = 
 # 	allB[ as.numeric(row.names(subset(allB,Sp =="DG") )), ]$nr.inflor *dg_conv 
 
+#With climate-change scenarios:
+ccs_temp = read.csv("rcp85_2019_2100.csv")[2:3]
+#ccs_temp = read.csv("rcp26_2019_2100.csv")[2:3]
+
 #=============================================================================
 #Tunable lattice parameters (space and time)
 #=============================================================================
 #If fast.bys = TRUE, then populations will be allowed to spread and track their
 #intrinsic ranges. 
-fast.bys=FALSE
+fast.bys=TRUE
 c.tol = 1e-2 #Tolerance for finite inidividuals, sets left/right range edges
 
 #For the climate change scenarios, tune the change in temp to the current 
 #average from field data: 
-# temp_field = mean(allB$gs_mean_temp)
-# ccs_temp = ccs_temp[,2]- temp_field
-# ccs_temp=c(0,ccs_temp)
-# mstart = 1
-# mstop = length(ccs_temp)
-# minc = 1
-# mtot= length(ccs_temp)
+temp_field = mean(allB$gs_mean_temp)
+ccs_temp = ccs_temp[,2]- temp_field
+ccs_temp=c(0,ccs_temp)
+mstart = 1
+mstop = length(ccs_temp)
+minc = 1
+mtot= length(ccs_temp)
 
 #For standard increments: 
-mstart = 0
-mstop = 6
-minc = 0.5
-mtot= ceiling((mstop-mstart)/minc)
+# mstart = 0
+# mstop = 6
+# minc = 0.5
+# mtot= ceiling((mstop-mstart)/minc)
 
-ngens=mtot #Number of generations for environmental change
+ngens=mtot-1 #Number of generations for environmental change
 iconfig=1 #NUmber of interattions of initial configuration of species
 
 #Spatial scale: Assume that the gradient is from 500m to 2500m in units of 10m
@@ -684,7 +677,9 @@ cc=array(c(matrix(0,ngenst,np),matrix(0,ngenst,np)),dim=c(ngenst,np,nspp))
 
 for( t in 1: ngenst){ 
 
-	ti = seq(mstart,mstop,minc)[t]
+	#ti = seq(mstart,mstop,minc)[t]
+	ti = ccs_temp[t]
+
 	xx_new = xx
 
 	xx_new$gs_mean_temp = as.matrix(xx_new$gs_mean_temp+ti)
@@ -830,8 +825,6 @@ for( t in 1: ngenst){
 
 	#=============================================================================
 	#Stationary multispecies distribution through numerical integration
-	#This part is very time-consuming. It may be better to uncomment and run only 
-	#this section as a separate simulation
 	#=============================================================================
 
 	s.index1= 1:nspp
@@ -842,7 +835,7 @@ for( t in 1: ngenst){
 	#Get the stationary multispecies distribution through numerical integration
 	tcomp=0 #Condition for stationary (joint) distribution of community
 	ts = 1
-	comp_thresh = 2 #Sensitivity threshold. Theoretically, should be 0, but allow for numerical discrepency
+	comp_thresh = 1 #Sensitivity threshold. Theoretically, should be 0, but allow for numerical discrepency
 
 	while (tcomp == 0 ){
 
@@ -896,11 +889,8 @@ for( t in 1: ngenst){
 				Frs[t,,s] = Frs[t,,s]*Fr.finite
 
 				print("Fast.bys")
-					par(mfrow=c(1,1))
-					plot(Frs[t,,1],t="l")
-					for (tt in 2:3){
-					lines(Frs[t,,tt])	
-	}
+					for (tt in 1:3){
+					lines(Frs[t,,tt], lty=3,col="blue")}	
 
 		}
 
@@ -1068,7 +1058,7 @@ print(t) #End loop through time
 file.name = (paste(f.name1, "_waldmean.var",sep=""))
 save(file=file.name, "l1", "D", "var_mu_Us","cov_e_mu_Us",
 "cov_lam_vc", "cov_lam_vc2", "Elam1", "Elam2", "gr1.n", "gr1", "y.full", 
-"w.eq.full","ldg.sim", "ldgIMP.sim", "covIMP.sim", "Frs", "env_analogue_all",
+"w.eq.full","ldg.sim", "ldgIMP.sim", "covIMP.sim", "Frs", "env_analogue",
 "sim.impacts", "sim.impactsIMP","covIMP.impacts","lded","nf","is.final")
 
 
