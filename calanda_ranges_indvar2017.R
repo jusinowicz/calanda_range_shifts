@@ -414,6 +414,7 @@ rr_var_ci=vector("list",v_num)
 
 ### Raw probability tables
 raw_prob_all = vector("list", v_num)
+raw_prob_dat = vector("list", v_num)
 ### Raw flower number data: 
 raw_rr_all = vector("list", v_num)
 
@@ -594,7 +595,7 @@ for( nv in 1:v_num){
 		#Save the results
 		flower_fit[[nv]][[sp]] = rr_tmp
 		flower_var_ci[[nv]][[sp]] = apply(mean.model, 1, quantile, c(0.025,0.975)) 
-		
+		raw_prob_dat[[nv]][[sp]] = dat
 		### Could turn this on for visuals: 
 		plot(raw_prob$iv1,raw_prob$Freq,ylim=c(0,1))
 		#amm = matrix(rowMeans(mean.model),dim(dat)[1], 1)
@@ -946,6 +947,7 @@ v_names = list( "Mean temperature", "Soil moisture",
 
     ### for prob variables, the probability of flowering
     raw_prob = raw_prob_all[[nv]][[sp]]
+    raw_dat = raw_prob_dat[[nv]][[sp]]
     rr_tmp = flower_fit[[nv]][[sp]]
     bu_tmp = flower_unc[[nv]][[sp]]
     fci=flower_var_ci[[nv]][[sp]]
@@ -955,10 +957,10 @@ v_names = list( "Mean temperature", "Soil moisture",
     mtext(paste(v_names[[nv]]),side=1, line=2.5, at=par("usr")[1]+1*diff(par("usr")[1:2]), cex.lab=1)
     axis(1, cex.lab = 1.5)
     if(nv ==3 ){ mtext("Probability of flowering",side=2,line=2.5)}
-    lines(raw_prob$iv1[order(raw_prob$iv1)],rr_tmp[order(raw_prob$iv1)],col="red",t="l")
-    lines(raw_prob$iv1[order(raw_prob$iv1)],bu_tmp[order(raw_prob$iv1)])
-    lines(raw_prob$iv1[order(raw_prob$iv1)],fci[,order(raw_prob$iv1)][1,] ,col="red",t="l",lty =3)
-    lines(raw_prob$iv1[order(raw_prob$iv1)],fci[,order(raw_prob$iv1)][2,] ,col="red",t="l",lty =3)
+    lines(raw_dat[,3][order(raw_dat[,3])],rr_tmp[order(raw_dat[,3])],col="red",t="l")
+    lines(raw_dat[,3][order(raw_dat[,3])],bu_tmp[order(raw_dat[,3])])
+    lines(raw_dat[,3][order(raw_dat[,3])],fci[,order(raw_dat[,3])][1,] ,col="red",t="l",lty =3)
+    lines(raw_dat[,3][order(raw_dat[,3])],fci[,order(raw_dat[,3])][2,] ,col="red",t="l",lty =3)
 
 
 
@@ -981,27 +983,3 @@ v_names = list( "Mean temperature", "Soil moisture",
   }
 dev.off()
 }
-
-flower_prob_all = vector("list",v_num)
-rr_gams_all = vector("list",v_num)
-#Fits
-flower_fit = vector("list",v_num)
-rr_fit = vector("list",v_num)
-#CIs
-flower_var_ci=vector("list",v_num)
-rr_var_ci=vector("list",v_num)
-
-### Raw probability tables
-raw_prob_all = vector("list", v_num)
-
-### The fitted variables against elevation. This can be declared ahead of time 
-### to speed up code since the spatial extent is known and fixed.  
-#Fits
-flower_probK_all = rep( list( matrix(0,np,nspp) ), v_num )
-rr_krig_all = rep( list( matrix(0,np,nspp) ), v_num )
-#CIs
-flower_space_ci = rep( list( matrix(0,np,2*nspp) ), v_num )
-rr_space_ci = rep( list( matrix(0,np,2*nspp) ), v_num )
-
-#The maximum of species' fitted reproduction, for scaling
-frs_max = matrix(0,ngenst,nspp)
