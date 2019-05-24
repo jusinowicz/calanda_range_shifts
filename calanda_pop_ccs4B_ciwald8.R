@@ -45,10 +45,8 @@ options(glmerControl=list(check.nobs.vs.rankZ = "warning",
 #=============================================================================
 #For naming files
 #=============================================================================
-#f.name1=c("calanda_ccs26_temp2_2017")
-#f.name1=c("calanda_ccs26_tsmfull2_2017")
-#f.name1=c("calanda_ccs85_temp2_2017")
-f.name1=c("calanda_ccs85_tsmfull2_2017")
+#f.name1=c("calanda_ccs26B_tsmfull2_2017")
+f.name1=c("calanda_ccs85B_tsmfull2_2017")
 #=============================================================================
 #Data: (see calanda2017.R)
 #=============================================================================
@@ -199,25 +197,21 @@ allB2=data.frame(allB2, year_numeric = as.numeric(allB2$year))
 variable_mat = colnames(allB2)[c(14,17,30,32,33,34,37)]
 
 # Control which variables to use. Should include at least year and mean temp
-#v_use= variable_mat[c(2,6)] #Temp only 
-#v_use= variable_mat[c(2,7)] #Soil moisture only 	
-#v_use= variable_mat[c(2,6,7)] #Temp + soil moisture
-v_use= variable_mat[c(2,4,6,7)] #Temp + soil moisture+min_temp
-#v_use= variable_mat[c(2,3,6,7)] #Temp + soil moisture+max_gdd
-#v_use= variable_mat[c(2,3,4,6,7)] #Temp + soil moisture + max_gdd+ gs_mean_temp 
-#v_use= variable_mat[c(2,1,3,4,6,7)] #elevation+Temp + soil moisture + max_gdd+ gs_mean_temp 
+# In this version of the code, 2 per-species lists are made: 
+# One for the flowering probability
+# One for the number of flowers 
+# The elements of the lists are based on AIC to find best model 
+v_use_flo = list( 
+	variable_mat[c(2,4,6,7)], #Sp1: Temp + soil moisture+max_gdd
+	variable_mat[c(2,3,6,7)], #Sp2: Temp + soil moisture+max_gdd
+	variable_mat[c(2,3,4,6,7)] #Sp3: Temp + soil moisture + max_gdd+ gs_min_temp 
+)
 
-nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
-
-#Speces-specific, variable-specific knots for smooth fits.
-#These are based on analysis of underlying factor fits (see file: )
-#Each species has 2 columns, one for flower probability model and one for total
-#flowers model:
-
-dgk = matrix(3,5,2); axk = dgk; hnk = dgk
-axk[2,1] = 5 #Soil moisture for AX
-hnk[2:3,1] = 5 #Soil moisture and min temp for HN
-var_spp_knots = list(dgk,axk,hnk)
+v_use_rr = list( 
+	variable_mat[c(2,3,6,7)], #Sp1: Temp + soil moisture + max_gdd+ gs_min_temp 
+	variable_mat[c(2,3,4,6,7)], #Sp2: Temp + soil moisture + max_gdd+ gs_min_temp 
+	variable_mat[c(2,3,6,7)] #Sp3: Temp + soil moisture+max_gdd
+)
 
 #=============================================================================
 #Tunable lattice parameters (space and time)
@@ -393,7 +387,6 @@ xx0=matrix(seq((-ns/2),(ns/2)))
 np=length(xx0)
 ngenst=iconfig+ngens
 
-
 #=============================================================================
 #survival 
 #=============================================================================
@@ -412,6 +405,7 @@ for(sp in 1:length(spp)){
 	sr_dat=subset(allsp, bg =='B')
 	sr_dat = subset(sr_dat, elevation>=el_real[1] & elevation<=el_real[5])
 	#sr[sp] = mean(allB2$survival)
+	#sr_gam = gam(survival~year_numeric+s(elevation,k=kn[sp])+s(year,bs="re"),family=binomial(link='logit'), data=sr_dat)
 	sr_gam = gam(survival~s(elevation,k=kn[sp])+s(year,bs="re"),family=binomial(link='logit'), data=sr_dat)
 	sr_tmp=as.vector(predict.gam(sr_gam, newdata=xx,type= "response"))
 	#Remove 0s
@@ -426,6 +420,7 @@ for(sp in 1:3) {
 	plot(sr_krigB[,sp],ylim=c(0,1))
 	#points(sr_krig[,sp],col="red")
 }
+
 
 
 #=============================================================================
@@ -973,6 +968,11 @@ for( t in 1: ngenst){
 	flower_prob_post=NULL
 	flower_prob_act = matrix(0,length(el_real),3)
 
+	kn = c(3,3,3)
+
+	env_distance_spp=list()
+	env_analogue_spp=list()
+
 	for(sp in 1:length(spp)){
 		allsp = subset(allB2, Sp == spp[sp])
 		rr_dat =subset(allsp, bg =='B')
@@ -985,20 +985,34 @@ for( t in 1: ngenst){
 			rr_dat$nr.inflor = rr_dat$nr.inflor*rr_dat$stalks	
 		}
 
+		### Find the elevation at which flowering peaks, then get the 
+		### average value of variables corresponding to the peak elevation. 
+	
+		#What are actual per-site probs? At which elevation does the
+		#peak occur? 
+		for (n in 1:length(el_real)) { 
+			tfp = subset(rr_dat, elevation == el_real[n])
+			#flower_prob_act[n,sp]= sum(tfp$flyes)/nrow(tfp)}
+			flower_prob_act[n,sp]= sum(tfp$flyes)
+		} #sum(tfp$flyes)/nrow(tfp)}
+		
+
 		### Make three important lists: spline fits, knots, penalty matrixes
 		sm=list()
 		knots_sm = list()
 		para_pen = list()
 
 		#Build the main data set with all of the variables
+		v_use = v_use_flo[[sp]]
+		nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
 		y = c(matrix(0, 1,1),rr_dat$flyes,matrix(0, 1,1))
 		yearx=unlist(list( factor(matrix(years,1,1)),rr_dat$year,factor(matrix(years,1,1))))
+
 		dat = data.frame (flyes = rr_dat$flyes, rr_dat[paste(v_use[(1:length(v_use))])])
 		dzeros = data.frame ( matrix(0, 1, ncol(dat)))
 		colnames(dzeros) = colnames(dat)
 		dat = rbind(dzeros,dat,dzeros)
 		dat$year = yearx
-
 		for( v in 1:nvar){ 
 			#Pick out the variable of interest:
 			iv_name = paste("rr_dat[[\"",v_use[(v+1)],"\"]]", sep="")
@@ -1010,7 +1024,7 @@ for( t in 1: ngenst){
 			#### Ensuring that smooth fits taper to 0 at upper and lower values
 			#By default, mgcv::gam places a knot at the extremes of the data and then the 
 			#remaining "knots" are spread evenly over the interval.
-			kuse= var_spp_knots[[sp]][v,1] #Effectively the number of knots
+			kuse= kn[sp] #Effectively the number of knots
 			nk = 2 #How many knots to add at ends to contstrain smooth? 
 			k1 = unique(iv1)
 			knots = seq(min(k1),max(k1),length=kuse)
@@ -1081,12 +1095,8 @@ for( t in 1: ngenst){
 		off = dat$flyes*0 + cp_y[1] ## offset term to force curve through a point
 
 		rr_gam = gam(as.formula(paste("flyes~", paste( paste(factors, collapse="+"),"+offset(off)+s(year, bs=\"re\")-1"))), 
-			paraPen=para_pen, data=dat, family=binomial(link='logit'),method = "REML" )
-		# rr_gam = gam(as.formula(paste("flyes~", paste( paste(factors, collapse="+"),"+offset(off)+s(year, bs=\"re\")-1"))), 
-		# 	paraPen=para_pen, data=dat, family=binomial(link='logit'))
-	
+			paraPen=para_pen, data=dat, family=binomial(link='logit'),method = "REML")
 		rr_tmp = predict(rr_gam, exclude = "s(year)")
-		#rr_tmp = predict(rr_gam, type="response", exclude = "s(year)")
 		
 		### coefficients from the penalized regression	
 		# ncs = c(0,0)
@@ -1172,13 +1182,12 @@ for( t in 1: ngenst){
 			rr_dat$nr.inflor = rr_dat$nr.inflor*rr_dat$stalks	
 		}
 
-
+		
 		for (n in 1:length(el_real)) { 
 			tfp = subset(rr_dat, elevation == elevations[n])
 			flower_act[n,sp]= mean(tfp$nr.inflor,na.rm=T)
 		}
 		flower_act[,sp][is.na(flower_act[,sp])] = 0
-
 
 		### Make three important lists: spline fits, knots, penalty matrixes
 		sm=list()
@@ -1186,6 +1195,9 @@ for( t in 1: ngenst){
 		para_pen = list()
 
 		#Build the main data set with all of the variables
+		v_use = v_use_rr[[sp]]
+		nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
+
 		y = c(matrix(0, 1,1),rr_dat$nr.inflor,matrix(0, 1,1))
 		yearx=unlist(list( factor(matrix(years,1,1)),rr_dat$year,factor(matrix(years,1,1))))
 		dat = data.frame (nr.inflor = rr_dat$nr.inflor, rr_dat[paste(v_use[(1:length(v_use))])])
@@ -1217,7 +1229,7 @@ for( t in 1: ngenst){
 			#### Ensuring that smooth fits taper to 0 at upper and lower values
 			#By default, mgcv::gam places a knot at the extremes of the data and then the 
 			#remaining "knots" are spread evenly over the interval.
-			kuse= kuse= var_spp_knots[[sp]][v,2] #Effectively the number of knots
+			kuse= kn[sp] #Effectively the number of knots
 			nk = 2 #How many knots to add at ends to contstrain smooth? 
 			k1 = unique(iv1)
 			knots = seq(min(k1),max(k1),length=kuse)
@@ -1287,9 +1299,8 @@ for( t in 1: ngenst){
 		off = dat$nr.inflor*0 + cp_y[1] ## offset term to force curve through a point
 
 		rr_gam= gam(as.formula(paste("nr.inflor~", paste( paste(factors, collapse="+"),"+offset(off)+s(year, bs=\"re\")-1"))), 
-			 paraPen=para_pen, data=dat,method = "REML")
-		# rr_gam= gam(as.formula(paste("nr.inflor~", paste( paste(factors, collapse="+"),"+offset(off)+s(year, bs=\"re\")-1"))), 
-		# 	paraPen=para_pen, data=dat)
+			paraPen=para_pen, data=dat,method = "REML")
+
 		rr_tmp = predict(rr_gam, exclude = "s(year)")
 	
 		### coefficients from the penalized regression	
@@ -1319,7 +1330,7 @@ for( t in 1: ngenst){
 		
 		### the predicted smooth, i.e. species' distribution
 		#rr_tmp = Xp%*%beta+coef(rr_gam)[1] #These are not on the response scale
-		rr_tmp = Xp%*%t(beta) + cp_y[1]
+		rr_tmp = Xp%*%t(beta)  + cp_y[1]
 
 		#The unconstrained model: 
 		bu_tmp=as.vector(predict(b.u,newdata=xx_new,type= "response",exclude = "s(year)") )
@@ -1365,31 +1376,32 @@ for( t in 1: ngenst){
 	}
 
 	Frs[t,,1] = Frs[t,,1]*3
+  
+ 
+  # fig.name = paste("calanda_ranges",paste(v_use[-1],collapse=""),".pdf",sep="")
+  # pdf(file=fig.name, height=11, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
+  col_use = c("black","red","blue")
+  par(mfrow=c(3,1))
+  plot(Frs[t,,2],t="l")
+  for (tt in 1:3){
+    lines(Frs[t,,tt],col=col_use[tt]) 
+  }
+
+  plot(flower_probK[,2],t="l",ylim=c(0,1))
+  for (tt in 1:3){
+    lines(flower_probK[,tt],col=col_use[tt])  
+  }
 
 
-	#fig.name = paste("calanda_ranges",paste(v_use[-1],collapse=""),".pdf",sep="")
-	#pdf(file=fig.name, height=11, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-	col_use = c("black","red","blue")
-	par(mfrow=c(3,1))
-	plot(Frs[t,,2],t="l")
-	for (tt in 1:3){
-		lines(Frs[t,,tt],col=col_use[tt])	
-	}
-
-	plot(flower_probK[,2],t="l",ylim=c(0,1))
-	for (tt in 1:3){
-		lines(flower_probK[,tt],col=col_use[tt])	
-	}
+  plot(rr_krig[,2],t="l")
+  for (tt in 1:3){
+    lines(rr_krig[,tt],col=col_use[tt]) 
+  }
 
 
-	plot(rr_krig[,2],t="l")
-	for (tt in 1:3){
-		lines(rr_krig[,tt],col=col_use[tt])	
-	}
+  #dev.off()
 
-
-	dev.off()
-	
+  #dev.off()
 	# #Frs[t,,1] = Frs[t,,1]*8
 	# for (sp in 1:length(spp)) {
 	# 	Frs_q1 = apply(flower_prob_post[[sp]]*rr_post[[sp]], 1, quantile, c(0.025,0.975))
@@ -1398,7 +1410,11 @@ for( t in 1: ngenst){
 	# }
 	
 	# #Frs[,,1] =Frs[,,1] - matrix(apply(matrix(Frs[,,1]),2,min),np, ngenst, byrow=T)
-
+	# par(mfrow=c(1,1))
+	# plot(Frs[t,,1],t="l")
+	# for (tt in 2:3){
+	# 	lines(Frs[t,,tt])	
+	# }
 
 	# env_var[[t]] = xx_new[,env.ind] }
 
@@ -1598,7 +1614,6 @@ for( t in 1: ngenst){
 	#positive LDG are allowed to equilibrate
 	#=============================================================================
 
-
 	s.index1= 1:nspp
 	burns=500
 	#Equilibrium populations of all spp. Columns represent space, rows are time. 
@@ -1632,7 +1647,7 @@ for( t in 1: ngenst){
 
 	y.full[[t]]= y 
 	w.eq.full[[t]]=w.eq
-	#env_analogue_all[[t]] = env_analogue 
+	env_analogue_all[[t]] = env_analogue 
 	env_var[[t]] = xx_new[,env.ind]
 
 print(t) #End loop through time

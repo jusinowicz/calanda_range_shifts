@@ -202,9 +202,9 @@ variable_mat = colnames(allB2)[c(14,17,30,32,33,34,37)]
 #v_use= variable_mat[c(2,6)] #Temp only 
 #v_use= variable_mat[c(2,7)] #Soil moisture only 	
 #v_use= variable_mat[c(2,6,7)] #Temp + soil moisture
-v_use= variable_mat[c(2,4,6,7)] #Temp + soil moisture+min_temp
+#v_use= variable_mat[c(2,4,6,7)] #Temp + soil moisture+min_temp
 #v_use= variable_mat[c(2,3,6,7)] #Temp + soil moisture+max_gdd
-#v_use= variable_mat[c(2,3,4,6,7)] #Temp + soil moisture + max_gdd+ gs_mean_temp 
+v_use= variable_mat[c(2,3,4,6,7)] #Temp + soil moisture + max_gdd+ gs_mean_temp 
 #v_use= variable_mat[c(2,1,3,4,6,7)] #elevation+Temp + soil moisture + max_gdd+ gs_mean_temp 
 
 nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
@@ -215,8 +215,8 @@ nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
 #flowers model:
 
 dgk = matrix(3,5,2); axk = dgk; hnk = dgk
-axk[2,1] = 5 #Soil moisture for AX
-hnk[2:3,1] = 5 #Soil moisture and min temp for HN
+#axk[2,1] = 5 #Soil moisture for AX
+#hnk[2:3,1] = 5 #Soil moisture and min temp for HN
 var_spp_knots = list(dgk,axk,hnk)
 
 #=============================================================================
@@ -1068,7 +1068,7 @@ for( t in 1: ngenst){
 		for (f in 1:nvar){
 			factors[f] = paste("X", f, sep="")
 			#factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp], ",  bs=\"cr\")", sep="")
-			factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp]+nk, ",  bs=\"cr\")", sep="")
+			factors2[f] = paste("s(",v_use[(f+1)], ", k = ", var_spp_knots[[sp]][f,1]+nk, ",  bs=\"cr\")", sep="")
 			#factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp]+nk, ")", sep="")
 
 		} 
@@ -1094,23 +1094,28 @@ for( t in 1: ngenst){
 		# if (coef(rr_gam)[(kuse+1)]>=0){ ncs[2] = 0} else {ncs[2] = min(coef(rr_gam)[2:(kuse+1)])}
 		# #beta = c(ncs[1],coef(rr_gam)[2:(kuse+1)],ncs[2])
 		#beta = c(0,coef(rr_gam)[2:(kuse+1)],0) #With intercept
-		beta = matrix(0, 1, (kuse*nvar+nvar*nk) )
+		kn = var_spp_knots[[sp]][ ,1]
+		kuse = sum(kn[1:nvar])
+		beta = matrix(0, 1, (kuse+nvar*nk) )
 		pnk = nk/2
+		kc=0
 		for( b in 1:nvar){
-			bpos = (b-1)*(kuse+nk)+pnk+1
-			kpos = (b-1)*kuse+1 #Intercept removed from rr_gam
-			beta[ bpos:(bpos+kuse-1)] = coef(rr_gam) [kpos:(kpos+kuse-1)]
+			if(b>1) {kc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+kc+pnk+1
+			kpos = kc+1 #Intercept removed from rr_gam
+			beta[ bpos:(bpos+kn[b]-1)] = coef(rr_gam) [kpos:(kpos+kn[b]-1)]
 		} 
 
 		### prediction matrix
-		Xp = matrix(0, dim(xx_new)[1], nvar*(kuse+nk))
+		Xp = matrix(0, dim(xx_new)[1], (kuse+nvar*nk))
 		#Xp = matrix(0, dim(dat)[1], nvar*(kuse+nk))
-
+		kc=0
 		for( b in 1:nvar){
-			kpos = (b-1)*(kuse+nk)+1
+			if(b>1) {kc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+kc+pnk
 			Xp_tmp = PredictMat(sm[[b]], xx_new)
 			#Xp_tmp = PredictMat(sm[[b]], dat)
-			Xp[,kpos:(kpos+nk+kuse-1)] = Xp_tmp
+			Xp[,bpos:(bpos+kn[b]+nk-1)] = Xp_tmp
 		}
 		
 
@@ -1157,7 +1162,6 @@ for( t in 1: ngenst){
 	rr_gams=NULL
 	rr_post = NULL
 
-	kn = c(3,3,3)
 	flower_act =matrix(0,length(el_real),3)
 
 	for(sp in 1:length(spp)){
@@ -1217,7 +1221,7 @@ for( t in 1: ngenst){
 			#### Ensuring that smooth fits taper to 0 at upper and lower values
 			#By default, mgcv::gam places a knot at the extremes of the data and then the 
 			#remaining "knots" are spread evenly over the interval.
-			kuse= kuse= var_spp_knots[[sp]][v,2] #Effectively the number of knots
+			kuse= var_spp_knots[[sp]][v,2] #Effectively the number of knots
 			nk = 2 #How many knots to add at ends to contstrain smooth? 
 			k1 = unique(iv1)
 			knots = seq(min(k1),max(k1),length=kuse)
@@ -1274,7 +1278,7 @@ for( t in 1: ngenst){
 		for (f in 1:nvar){
 			factors[f] = paste("X", f, sep="")
 			#factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp], ",  bs=\"cr\")", sep="")
-			factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp]+nk, ",  bs=\"cr\")", sep="")
+			factors2[f] = paste("s(",v_use[(f+1)], ", k = ",var_spp_knots[[sp]][f,2]+nk, ",  bs=\"cr\")", sep="")
 			#factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp]+nk, ")", sep="")
 
 		} 
@@ -1298,23 +1302,28 @@ for( t in 1: ngenst){
 		# if (coef(rr_gam)[(kuse+1)]>=0){ ncs[2] = 0} else {ncs[2] = min(coef(rr_gam)[2:(kuse+1)])}
 		# #beta = c(ncs[1],coef(rr_gam)[2:(kuse+1)],ncs[2])
 		#beta = c(0,coef(rr_gam)[2:(kuse+1)],0) #With intercept
-		beta = matrix(0, 1, (kuse*nvar+nvar*nk) )
+		kn = var_spp_knots[[sp]][ ,2]
+		kuse = sum(kn[1:nvar])
+		beta = matrix(0, 1, (kuse+nvar*nk) )
 		pnk = nk/2
+		kc=0
 		for( b in 1:nvar){
-			bpos = (b-1)*(kuse+nk)+pnk+1
-			kpos = (b-1)*kuse+1 #Intercept removed from rr_gam
-			beta[ bpos:(bpos+kuse-1)] = coef(rr_gam) [kpos:(kpos+kuse-1)]
+			if(b>1) {kc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+kc+pnk+1
+			kpos = kc+1 #Intercept removed from rr_gam
+			beta[ bpos:(bpos+kn[b]-1)] = coef(rr_gam) [kpos:(kpos+kn[b]-1)]
 		} 
-		
-		### prediction matrix
-		Xp = matrix(0, dim(xx_new)[1], nvar*(kuse+nk))
-		#Xp = matrix(0, dim(dat)[1], nvar*(kuse+nk))
 
+		### prediction matrix
+		Xp = matrix(0, dim(xx_new)[1], (kuse+nvar*nk))
+		#Xp = matrix(0, dim(dat)[1], nvar*(kuse+nk))
+		kc=0
 		for( b in 1:nvar){
-			kpos = (b-1)*(kuse+nk)+1
+			if(b>1) {kc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+kc+pnk
 			Xp_tmp = PredictMat(sm[[b]], xx_new)
 			#Xp_tmp = PredictMat(sm[[b]], dat)
-			Xp[,kpos:(kpos+nk+kuse-1)] = Xp_tmp
+			Xp[,bpos:(bpos+kn[b]+nk-1)] = Xp_tmp
 		}
 		
 		### the predicted smooth, i.e. species' distribution
@@ -1367,8 +1376,8 @@ for( t in 1: ngenst){
 	Frs[t,,1] = Frs[t,,1]*3
 
 
-	#fig.name = paste("calanda_ranges",paste(v_use[-1],collapse=""),".pdf",sep="")
-	#pdf(file=fig.name, height=11, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
+	fig.name = paste("calanda_ranges",paste(v_use[-1],collapse=""),".pdf",sep="")
+	pdf(file=fig.name, height=11, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
 	col_use = c("black","red","blue")
 	par(mfrow=c(3,1))
 	plot(Frs[t,,2],t="l")
