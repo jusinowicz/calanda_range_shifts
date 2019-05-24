@@ -32,14 +32,6 @@ variable.list=list("l1", "D", "var_mu_Us","cov_e_mu_Us",
 
 
 #List of scenario file names 
-#file.name.list=c("calanda_ccs85_tsm_2017_waldmean.var")
-#file.name.list=c("calanda_ccs26_tsm_2017_waldmean.var")
-
-# file.name.list=c("calanda_ccs85B_tsm_2017_waldmean.var")
-# file.name.list=c("calanda_ccs26B_tsm_2017_waldmean.var")
-
-# file.name.list=c("calanda_ccs85_temp_2017_waldmean.var")
-# file.name.list=c("calanda_ccs26_temp_2017_waldmean.var")
 
 # file.name.list=c("calanda_ccs26_temp_2017_waldmean.var", 
 #   "calanda_ccs26_tsm_2017_waldmean.var", 
@@ -47,11 +39,17 @@ variable.list=list("l1", "D", "var_mu_Us","cov_e_mu_Us",
 #   "calanda_ccs85_tsm_2017_waldmean.var", 
 #   "calanda_ccs85B_tsm_2017_waldmean.var")
 
-file.name.list=c("calanda_ccs26_temp_2017_waldmean.var", 
-  "calanda_ccs26_tsm_2017_waldmean.var", 
-  "calanda_ccs26B_tsm_2017_waldmean.var", 
+# file.name.list=c("calanda_ccs26_temp_2017_waldmean.var", 
+#   "calanda_ccs26_tsm_2017_waldmean.var", 
+#   "calanda_ccs26B_tsm_2017_waldmean.var", 
+#   "calanda_ccs85_tsmfull_2017_waldmean.var", 
+#   "calanda_ccs85B_tsmfull_2017_waldmean.var")
+
+file.name.list=c(
   "calanda_ccs85_tsmfull_2017_waldmean.var", 
-  "calanda_ccs85B_tsmfull_2017_waldmean.var")
+  "calanda_ccs85B_tsmfull_2017_waldmean.var",  
+  "calanda_ccs26_tsmfull_2017_waldmean.var", 
+  "calanda_ccs26B_tsmfull_2017_waldmean.var")
 
 # file.name.list=c("calanda_ccs26_temp_2017_waldmean.var", 
 #   "calanda_ccs85_temp_2017_waldmean.var",
@@ -67,8 +65,7 @@ file.name.list=c("calanda_ccs26_temp_2017_waldmean.var",
 
 #prefix.list= list("sc1")
 #prefix.list= list("sc26temp","sc26tsm","sc26Btsm","sc85tsm","sc85Btsm")
-prefix.list= list("sc26temp","sc26tsm","sc26Btsm","sc85tsm","sc85Btsm")
-
+prefix.list= list("sc85tsm","sc85Btsm","sc26tsm","sc26Btsm")
 
 #Rename the files from each scenario
 var.length=length(variable.list)
@@ -103,7 +100,8 @@ for (g in 1:nscen){
 # prefix.list= list("comb")
 # nscen=1
 
-ylims=c(1,1.5)
+ylims=c(1,2.7)
+ylims=c(1,1.3)
 plot(sc85tsmldg.sim[,1], ylim=ylims)
 points(sc85Btsmldg.sim[,1], pch=16)
 points(sc26tsmldg.sim[,1], pch=2)
@@ -311,19 +309,26 @@ xx$e2 = as.matrix(xx$e2)
 
 #Time increments
 mstart = 1
-mstop = 41
-minc = 10
+mstop = 61
+minc = 20
 mtot= ceiling((mstop-mstart)/minc)
 m.labels=as.character(seq(mstart,mstop,minc))
 
 #=============================================================================
+g=4
+
+new.name=paste(prefix.list[[g]],"Frs",sep="")  
+assign("sc1Frs",eval(as.name(new.name)))
+new.name2=paste(prefix.list[[g]],"nf",sep="")  
+assign("sc1nf",eval(as.name(new.name2)))
+
 
 epoints = match( elevations,xx$elevation)
 
- fig.name = paste("intrinsic_ipcc26_temp_soilmoist_conf.pdf",sep="")
- pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
+fig.name = paste("intrinsic_ipcc26_tsmB1.pdf",sep="")
+pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
 
-par(mfrow=c(2,1),mai= c( 0.0, 0.2, 0.0, 0.2), omi=c(0.5,0.75,0.5,0.75)) #,mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75))
+ par(mfrow=c(2,1),mai= c( 0.0, 0.2, 0.0, 0.2), omi=c(0.5,0.75,0.5,0.75)) #,mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75))
 
 #####
 # Panel 1: Intrinsic ranges
@@ -334,17 +339,17 @@ ylim=c(-1,60)
 x.txt = c(1900,1600,2500)
 #Current: 
 #plot(xx$elevation, sc1Frs[1,,1]*6, t="l", xlab="", ylab="Seeds (per-capita, Kriged) ",  xaxt="n", xaxs="i",yaxs="i",cex.main=1.3,cex.lab=1.3,ylim=ylim)
-plot(xx$elevation, sc1Frs[1,,1]*6, t="l", xlab="Elevation", ylab="Seeds (per-capita, Kriged) ",   xaxs="i",yaxs="i",cex.main=1.3,cex.lab=1.3,ylim=ylim)
+plot(xx$elevation, sc1Frs[1,,1], t="l", xlab="Elevation", ylab="Seeds (per-capita, Kriged) ",   xaxs="i",yaxs="i",cex.main=1.3,cex.lab=1.3,ylim=ylim)
 
 #abline(v=c(elevations),lwd=10,col="grey80")
-lines(xx$elevation,sc1Frs[1,,1]*6)
+lines(xx$elevation,sc1Frs[1,,1])
 lines(xx$elevation, sc1Frs[1,,2],col="red")
 lines(xx$elevation, sc1Frs[1,,3],col="blue")
-polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[1]][[1]][1,]*6*8*1.5), sc1Frs_ci[[1]][[1]][2,]*6*8*1.5),col=alpha(rgb(t(matrix(col2rgb("grey20"))),maxColorValue=255),0.2), border = NA)
-polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[1]][[2]][1,]), sc1Frs_ci[[1]][[2]][2,]),col=alpha(rgb(t(matrix(col2rgb("red"))),maxColorValue=255),0.2), border = NA)
-polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[1]][[3]][1,]), sc1Frs_ci[[1]][[3]][2,]),col=alpha(rgb(t(matrix(col2rgb("blue"))),maxColorValue=255),0.2), border = NA)
+# polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[1]][[1]][1,]*6*8*1.5), sc1Frs_ci[[1]][[1]][2,]*6*8*1.5),col=alpha(rgb(t(matrix(col2rgb("grey20"))),maxColorValue=255),0.2), border = NA)
+# polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[1]][[2]][1,]), sc1Frs_ci[[1]][[2]][2,]),col=alpha(rgb(t(matrix(col2rgb("red"))),maxColorValue=255),0.2), border = NA)
+# polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[1]][[3]][1,]), sc1Frs_ci[[1]][[3]][2,]),col=alpha(rgb(t(matrix(col2rgb("blue"))),maxColorValue=255),0.2), border = NA)
 
-text(x=x.txt[1], y=sc1Frs[1,x.txt[1],1]*6 , labels=m.labels[1])
+text(x=x.txt[1], y=sc1Frs[1,x.txt[1],1], labels=m.labels[1])
 text(x=x.txt[2], y=sc1Frs[1,x.txt[2],2] , labels=m.labels[1],col="red")
 text(x=x.txt[3], y=sc1Frs[1,x.txt[3],3] , labels=m.labels[1],col="blue")
 
@@ -354,17 +359,18 @@ text(x=x.txt[3], y=sc1Frs[1,x.txt[3],3] , labels=m.labels[1],col="blue")
 
 #Future
 
-for(n in seq(3,length(m.labels),2)){
-lines(xx$elevation, sc1Frs[n,,1]*6,lty=2)
-text(x=x.txt[1], y=sc1Frs[n,x.txt[1],1]*6 , labels=m.labels[(n)])
+#for(n in seq(3,length(m.labels),2)){
+for(n in 1:length(m.labels)) {
+lines(xx$elevation, sc1Frs[n,,1],lty=2)
+text(x=x.txt[1], y=sc1Frs[n,x.txt[1],1] , labels=m.labels[(n)])
 lines(xx$elevation, sc1Frs[n,,2],col="red",lty=2)
 text(x=x.txt[2], y=sc1Frs[n,x.txt[2],2] , labels=m.labels[(n)],col="red")
 lines(xx$elevation, sc1Frs[n,,3],col="blue",lty=2)
 text(x=x.txt[3], y=sc1Frs[n,x.txt[3],3] , labels=m.labels[(n)],col="blue")
 
-polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[n]][[1]][1,]*6*8*1.5), sc1Frs_ci[[n]][[1]][2,]*6*8*1.5),col=alpha(rgb(t(matrix(col2rgb("grey80"))),maxColorValue=255),0.4), border = NA)
-polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[n]][[2]][1,]), sc1Frs_ci[[n]][[2]][2,]),col=alpha(rgb(t(matrix(col2rgb("red"))),maxColorValue=255),0.4), border = NA)
-polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[n]][[3]][1,]), sc1Frs_ci[[n]][[3]][2,]),col=alpha(rgb(t(matrix(col2rgb("blue"))),maxColorValue=255),0.4), border = NA)
+# polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[n]][[1]][1,]*6*8*1.5), sc1Frs_ci[[n]][[1]][2,]*6*8*1.5),col=alpha(rgb(t(matrix(col2rgb("grey80"))),maxColorValue=255),0.4), border = NA)
+# polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[n]][[2]][1,]), sc1Frs_ci[[n]][[2]][2,]),col=alpha(rgb(t(matrix(col2rgb("red"))),maxColorValue=255),0.4), border = NA)
+# polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[n]][[3]][1,]), sc1Frs_ci[[n]][[3]][2,]),col=alpha(rgb(t(matrix(col2rgb("blue"))),maxColorValue=255),0.4), border = NA)
 
 # points(xx$elevation[epoints], sc1Frs.all[[n]][1,epoints,1])
 # points(xx$elevation[epoints], sc1Frs.all[[n]][1,epoints,2],col="red")
@@ -379,7 +385,7 @@ polygon(c(rev(xx$elevation), xx$elevation), c(rev(sc1Frs_ci[[n]][[3]][1,]), sc1F
 # Panel 2: Realized ranges
 #####
 
-ylim=c(-1,150)
+ylim=c(-1,180)
 x.txt = c(1900,1600,2500)
 #Current: 
 plot(xx$elevation, sc1nf[1,,1], t="l", ylab="Seeds (per-capita, Kriged) ", xlab="Elevation", xaxs="i",yaxs="i",cex.main=1.3,cex.lab=1.3,ylim=ylim)
@@ -397,7 +403,8 @@ text(x=x.txt[3], y=sc1nf[1,x.txt[3],3] , labels=m.labels[1],col="blue")
 
 #Future
 
-for(n in seq(3,length(m.labels),2)){
+#for(n in seq(3,length(m.labels),2)){
+for(n in 1:length(m.labels)) {
 lines(xx$elevation, sc1nf[n,,1],lty=2)
 text(x=x.txt[1], y=sc1nf[n,x.txt[1],1] , labels=m.labels[(n)])
 lines(xx$elevation, sc1nf[n,,2],col="red",lty=2)
@@ -438,8 +445,8 @@ nscen=6
 #x.axx = matrix(c(0.0,0.15,0.05,0.2,2.3,0.4,0.2,2.3,0.4, 0.2,2.3,0.4 ),4,3,byrow=T)
 
 
-fig.name = paste("calanda_widthOverlap_igrsites12it3.pdf",sep="")
-pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
+# fig.name = paste("calanda_widthOverlap_igrsites12it3.pdf",sep="")
+# pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
 
 #Set this up as a panel of 4, or see below for individual files. 
 par(mfrow=c(nscen/2,2),mai= c( 0.25, 0.2, 0.25, 0.2), omi=c(0.5,0.75,0.5,0.75)) #,mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75))
@@ -473,7 +480,8 @@ for( g in 1:1){
 	assign("l1",eval(as.name(l1.name)) )
 	assign("D",eval(as.name(D.name))  )
 
-	for(s in seq(3,length(m.labels),2)) {
+#	for(s in seq(3,length(m.labels),2)) {
+  for(s in 1:length(m.labels)) {
 		
 		min_overlap1=0
 		xlimsa=0
@@ -535,7 +543,8 @@ assign("D",eval(as.name(D.name)) )
 assign("w.eq",eval(as.name(w.eq.name))[[s]]  )
 
 
-for( s in seq(3,length(m.labels),2)){ 
+#for( s in seq(3,length(m.labels),2)){ 
+for(s in 2:length(m.labels)) {
 
 	color.use=list("black","red","blue")
 	up.low=list("upper","lower")
