@@ -1,19 +1,62 @@
 #=============================================================================
-# R code for simulating species range shifts and calculating the strength of 
-# coexistence between competitors. This code is based on the 
-# coexistence_range_shifts code from an earlier repository, which means that 
-# the underlying population dynamics are still modeled with a spatially explicit
-# Leslie-Gower function. But the new code includes severa changes/additions 
-# including:
+# R code for simulating climate-driven range shifts and calculating the 
+# strength of coexistence between competitors. This code is built around a 
+# specific spatially excplicit model of population dynamics, the Leslie-Gower 
+# model (with some slight modifications). It includes a number of statistical 
+# models for inferring Leslie-Gower parameters from experimental data. 
 #
-# 1. Reproduction is a function of two processes that are both a function of 
-# 	spatial location: probability of flowering, total flowers 
-# 2. GAMs fit to abiotic covariates of elevation, i.e. mean temp, min temp, 
-#    GDD, and soil moisture. 
-# 3. Kriging of intrinsic ranges based on the GAM statistical fits.
-# 4. Dispersal kernels that are based on the WALD approach (see code for references)
-# 5. Analysis of persistence with dispersal kernels that vary in space 
-# 	(i.e. are per-site dispersal kernels).
+# The main loop of this code increments over yearly changes in environmental
+# conditions taken from one of two IPCC scenarios that bookend expectations 
+# (2.6 and 8.5). 
+# 
+# 1. Underlying environmental data come from a combination of sources: HOBO
+#	 data loggers placed in the field from 2015 -2017, and TerraClimate maps.
+#	 See calanda_env2017B_2.R for the pre-processing approach to these data. 
+#	 Here, the data are assumed to be available already in the main data
+#	 variable (allB2). These data are loaded and fit by simple GAMMs (with 
+#	 year included as a random effect) with elevation as the only covariate,
+#	 which are used to interpolate the environmental variables at a finer 
+#	 spatial scale.
+# 
+# 2. Survival is fit by a GAMM (year as a random effect) to look for significant
+#	 variation over elevation. Since it is fairly minimal over the sampled 
+#	 elevation range (1000-2000m) an average value is used in the Leslie-Gower
+#    model. 
+# 
+# 3. Competition coefficients are fit through a combination of bootstrapping 
+#	 and NLS. See calanda_stats_tests1.R for an exploration of different 
+#	 approaches for finding the competition coefficients. 
+#
+# 4. Dispersal kernels are based on the WALD approach (Katul, G. G., et al. 2005. 
+#    Mechanistic Analytical Models for Long‐Distance Seed Dispersal by Wind. 
+#	 The American Naturalist 166:368–381). This requires calculating the height
+#	 of plants from field measurements. Average height is used across sampled
+#	 elevations. A number of other parameters are determined either from the 
+#	 primary literature or field measurements of wind. See wald_functions1.R for 
+#    more information and references. 
+#
+# 5. Intrinsic ranges are calculated as a product of two separate underlying 
+# 	 processes: probability of flowering, and number of flowers. Each process
+#	 is fit using a GAMM (year as a random effect). Intrinsic ranges can be 
+#	 fit with a number of environmental covariates, and this code allows a number
+#	 of combinations. However, the covariates of primary interest are the 
+#    mean growing season temp, min temp, number of growing degree days (GDD), 
+#	 and monthly average soil moisture. In order to produce nice ranges that
+#	 taper towards zero at range margins, the underlying smooth fits of covariates
+#	 have been constrained to go to 0 at upper and lower intervals. This has 
+#	 necessitated writing a bit of additional code by hand. 
+#    
+#	 Range shifts are modeled by using the GAMMs (which have been fit to baseline 
+#    conditions) to project a new range given the underlying change in covariates 
+#    with each IPCC scenario. 
+#
+# 6. Coexistence is calculated and the coexistence mehanisms are parsed out in 
+#	 two phases. Resident stationary distributions are calculate, and the invader
+#    low-density stationary distribution is calculated. A combination of analytical
+#	 approximations and simulations are used to calculate the LDG and the 
+#	 fitness-density covariance. See range_coexistence_functionsWALD.R. 
+#
+# 7. The full community stationary distribution is calculted numerically. 
 #=============================================================================
 #=============================================================================
 # Load these libraries
@@ -215,8 +258,6 @@ nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
 #flowers model:
 
 dgk = matrix(3,5,2); axk = dgk; hnk = dgk
-axk[2,1] = 5 #Soil moisture for AX
-hnk[2:3,1] = 5 #Soil moisture and min temp for HN
 var_spp_knots = list(dgk,axk,hnk)
 
 #=============================================================================
@@ -1217,7 +1258,7 @@ for( t in 1: ngenst){
 			#### Ensuring that smooth fits taper to 0 at upper and lower values
 			#By default, mgcv::gam places a knot at the extremes of the data and then the 
 			#remaining "knots" are spread evenly over the interval.
-			kuse= kuse= var_spp_knots[[sp]][v,2] #Effectively the number of knots
+			kuse= kn[sp] #Effectively the number of knots
 			nk = 2 #How many knots to add at ends to contstrain smooth? 
 			k1 = unique(iv1)
 			knots = seq(min(k1),max(k1),length=kuse)
