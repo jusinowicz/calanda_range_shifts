@@ -6,7 +6,7 @@ This code is based on the coexistence_range_shifts code from an earlier reposito
 
 1. Statistical explorations of probability of survival and flowering, as a function of elevation, abiotic variables, and of plant size. 
 2. Reproduction is a function of two processes that are both a function of spatial location: probability of flowering, total flowers 
-3. GAMMs fit to abiotic covariates of elevation using R package gamm4, i.e. mean temp, min temp,GDD, and soil moisture. 
+3. GAMMs fit to abiotic covariates of elevation using R package gamm4, i.e. mean temp, min temp,GDD, and soil moisture. This code also includes a new approach for constraining the fits of smooth terms. This helps ensure that intrinsic ranges have a nice fit in the end -- i.e., that they taper towards zero at upper and lower range limits.  
 4. Kriging of intrinsic ranges based on the GAMM statistical fits.
 5. Dispersal kernels that are based on the WALD approach (see code for references)
 6. Environmental change modeled on an annual time-step with IPCC climate change scenarios 8.5 and 2.6. This code calculates population spread rates and checks whether species fail to track their intrinsic ranges. 
