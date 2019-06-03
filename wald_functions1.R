@@ -30,7 +30,7 @@
 #               What is the name of the column with the wind speed? 
 #               If false, what column number? 
 
- get.u_mean=function(site_files,headers, col_name)){
+ get.u_mean=function(site_files,headers, col_name){
 
   nsites= length(site_files)
   site_means=matrix(0,nsites,1)
@@ -67,7 +67,7 @@
     }
 
  }
-
+}
 #=============================================================================
 #Get beta_sum
 #=============================================================================

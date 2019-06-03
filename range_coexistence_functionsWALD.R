@@ -974,7 +974,7 @@ get.fd.cov2 = function (Fr.spp, sp.ids, nrs.spp, sr.spp, alpha.spp, kd.spp, kc.s
 #It includes get.fast.igr, get.spread.rate, and 
 
 #Get the IGR for a single time step
-get.fast.igr = function (Fr.inv, nr.spp, sr,alphas,kd,kc,n.inv){
+get.fast.igr = function (Fr.inv, nr.spp, sr,alphas,kd,kc,fkd.yes,n.inv){
 
 
 	inv.one =pop_lg(Fr.inv, nr.spp, sr,alphas,kd,kc,fkd.yes)[,n.inv]
