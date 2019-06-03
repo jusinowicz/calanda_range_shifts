@@ -1,19 +1,62 @@
 #=============================================================================
-# R code for simulating species range shifts and calculating the strength of 
-# coexistence between competitors. This code is based on the 
-# coexistence_range_shifts code from an earlier repository, which means that 
-# the underlying population dynamics are still modeled with a spatially explicit
-# Leslie-Gower function. But the new code includes severa changes/additions 
-# including:
+# R code for simulating climate-driven range shifts and calculating the 
+# strength of coexistence between competitors. This code is built around a 
+# specific spatially excplicit model of population dynamics, the Leslie-Gower 
+# model (with some slight modifications). It includes a number of statistical 
+# models for inferring Leslie-Gower parameters from experimental data. 
 #
-# 1. Reproduction is a function of two processes that are both a function of 
-# 	spatial location: probability of flowering, total flowers 
-# 2. GAMs fit to abiotic covariates of elevation, i.e. mean temp, min temp, 
-#    GDD, and soil moisture. 
-# 3. Kriging of intrinsic ranges based on the GAM statistical fits.
-# 4. Dispersal kernels that are based on the WALD approach (see code for references)
-# 5. Analysis of persistence with dispersal kernels that vary in space 
-# 	(i.e. are per-site dispersal kernels).
+# The main loop of this code increments over yearly changes in environmental
+# conditions taken from one of two IPCC scenarios that bookend expectations 
+# (2.6 and 8.5). 
+# 
+# 1. Underlying environmental data come from a combination of sources: HOBO
+#  data loggers placed in the field from 2015 -2017, and TerraClimate maps.
+#  See calanda_env2017B_2.R for the pre-processing approach to these data. 
+#  Here, the data are assumed to be available already in the main data
+#  variable (allB2). These data are loaded and fit by simple GAMMs (with 
+#  year included as a random effect) with elevation as the only covariate,
+#  which are used to interpolate the environmental variables at a finer 
+#  spatial scale.
+# 
+# 2. Survival is fit by a GAMM (year as a random effect) to look for significant
+#  variation over elevation. Since it is fairly minimal over the sampled 
+#  elevation range (1000-2000m) an average value is used in the Leslie-Gower
+#    model. 
+# 
+# 3. Competition coefficients are fit through a combination of bootstrapping 
+#  and NLS. See calanda_stats_tests1.R for an exploration of different 
+#  approaches for finding the competition coefficients. 
+#
+# 4. Dispersal kernels are based on the WALD approach (Katul, G. G., et al. 2005. 
+#    Mechanistic Analytical Models for Long‐Distance Seed Dispersal by Wind. 
+#  The American Naturalist 166:368–381). This requires calculating the height
+#  of plants from field measurements. Average height is used across sampled
+#  elevations. A number of other parameters are determined either from the 
+#  primary literature or field measurements of wind. See wald_functions1.R for 
+#    more information and references. 
+#
+# 5. Intrinsic ranges are calculated as a product of two separate underlying 
+#    processes: probability of flowering, and number of flowers. Each process
+#  is fit using a GAMM (year as a random effect). Intrinsic ranges can be 
+#  fit with a number of environmental covariates, and this code allows a number
+#  of combinations. However, the covariates of primary interest are the 
+#    mean growing season temp, min temp, number of growing degree days (GDD), 
+#  and monthly average soil moisture. In order to produce nice ranges that
+#  taper towards zero at range margins, the underlying smooth fits of covariates
+#  have been constrained to go to 0 at upper and lower intervals. This has 
+#  necessitated writing a bit of additional code by hand. 
+#    
+#  Range shifts are modeled by using the GAMMs (which have been fit to baseline 
+#    conditions) to project a new range given the underlying change in covariates 
+#    with each IPCC scenario. 
+#
+# 6. Coexistence is calculated and the coexistence mehanisms are parsed out in 
+#  two phases. Resident stationary distributions are calculate, and the invader
+#    low-density stationary distribution is calculated. A combination of analytical
+#  approximations and simulations are used to calculate the LDG and the 
+#  fitness-density covariance. See range_coexistence_functionsWALD.R. 
+#
+# 7. The full community stationary distribution is calculted numerically. 
 #=============================================================================
 #=============================================================================
 # Load these libraries
@@ -46,9 +89,9 @@ options(glmerControl=list(check.nobs.vs.rankZ = "warning",
 #For naming files
 #=============================================================================
 #f.name1=c("calanda_ccs26_temp2_2017")
-#f.name1=c("calanda_ccs26_tsmfull2_2017")
+f.name1=c("calanda_ccs26_tsmfull3_2017")
 #f.name1=c("calanda_ccs85_temp2_2017")
-f.name1=c("calanda_ccs85_tsmfull2_2017")
+#f.name1=c("calanda_ccs85_tsmfull3_2017")
 #=============================================================================
 #Data: (see calanda2017.R)
 #=============================================================================
@@ -56,11 +99,11 @@ load(file="calanda_allB2017_2.var")
 rm(allB)
 
 #With climate-change scenarios:
-ccs_temp = read.csv("rcp85_2019_2100.csv")[2:3]
-#ccs_temp = read.csv("rcp26_2019_2100.csv")[2:3]
+#ccs_temp = read.csv("rcp85_2019_2100.csv")[2:3]
+ccs_temp = read.csv("rcp26_2019_2100.csv")[2:3]
 
-ccs_soil = read.csv("rcp85_mrso_2019_2100.csv")[1:2]
-#ccs_soil = read.csv("rcp26_mrso_2019_2100.csv")[1:2]
+#ccs_soil = read.csv("rcp85_mrso_2019_2100.csv")[1:2]
+ccs_soil = read.csv("rcp26_mrso_2019_2100.csv")[1:2]
 
 #=============================================================================
 #Some necessary tweaks to the data set to fix various things 
@@ -201,10 +244,10 @@ variable_mat = colnames(allB2)[c(14,17,30,32,33,34,37)]
 # Control which variables to use. Should include at least year and mean temp
 #v_use= variable_mat[c(2,6)] #Temp only 
 #v_use= variable_mat[c(2,7)] #Soil moisture only 	
-#v_use= variable_mat[c(2,6,7)] #Temp + soil moisture
+v_use= variable_mat[c(2,6,7)] #Temp + soil moisture
 #v_use= variable_mat[c(2,4,6,7)] #Temp + soil moisture+min_temp
 #v_use= variable_mat[c(2,3,6,7)] #Temp + soil moisture+max_gdd
-v_use= variable_mat[c(2,3,4,6,7)] #Temp + soil moisture + max_gdd+ gs_mean_temp 
+#v_use= variable_mat[c(2,3,4,6,7)] #Temp + soil moisture + max_gdd+ gs_mean_temp 
 #v_use= variable_mat[c(2,1,3,4,6,7)] #elevation+Temp + soil moisture + max_gdd+ gs_mean_temp 
 
 nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
@@ -215,8 +258,9 @@ nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
 #flowers model:
 
 dgk = matrix(3,5,2); axk = dgk; hnk = dgk
-#axk[2,1] = 5 #Soil moisture for AX
-#hnk[2:3,1] = 5 #Soil moisture and min temp for HN
+dgk[2,1] = 2 #Soil moisture for DG prob
+#axk[2,1] = 5 #Soil moisture for AX prob
+#hnk[2:3,1] = 5 #Soil moisture and min temp for HN prob
 var_spp_knots = list(dgk,axk,hnk)
 
 #=============================================================================
@@ -324,8 +368,8 @@ gdd_gam = gamm4(max_gdd~s(elevation,k=5), random = ~(1|year),data=allB2)
 #Minimum growing season temp
 #gmt_gam = gam( gs_min_temp~ s(year,bs="re")+s(elevation,k=3),data=allB2)
 #gmt_gam = gam( an_min_temp~ s(year,bs="re")+I(elevation^2),data=allB2)
-#gmt_gam = gamm4( gs_min_temp~ I(elevation^2), random = ~(1|year), data=subset(allB2, !is.na(allB2$gs_mean_temp)) )
-gmt_gam = gamm4(gs_min_temp~s(elevation,k=5), random = ~(1|year),data=allB2)
+gmt_gam = gamm4( gs_min_temp~ elevation+ I(elevation^2), random = ~(1|year), data=subset(allB2, !is.na(allB2$gs_mean_temp)) )
+#gmt_gam = gamm4(gs_min_temp~s(elevation,k=2), random = ~(1|year),data=allB2)
 
 #=============================================================================
 # #Equivalent but wrong: 
@@ -360,7 +404,7 @@ xx_gdd = as.vector(predict.gam(gdd_gam$gam, newdata=xx,type= "response"))
 
 #Min temp 
 xx_gmt = as.vector(predict.gam(gmt_gam$gam, newdata=xx,type= "response"))
-#xx_gmt = predict( lm(xx_gmt~xx$elevation)) #Uncomment to linearize xx_gmt
+xx_gmt = predict( lm(xx_gmt~xx$elevation)) #Uncomment to linearize xx_gmt
 
 #Make the internal spatial variables
 xx=cbind(xx,xx_mt,xx_sm,xx_sp,xx_sd,xx_ml,xx_gdd, xx_gmt)
@@ -407,17 +451,35 @@ sr_krigB = matrix(0,dim(xx)[1], length(spp))
 sr_probB=NULL
 kn = c(4,4,4)
 sr=matrix(0,nspp,1)
+raw_sr_all=vector("list", nspp)
 for(sp in 1:length(spp)){
 	allsp = subset(allB2, Sp == spp[sp])
-	sr_dat=subset(allsp, bg =='B')
+
+	##1) Survival with background as fixed effect
+	# sr_dat = allsp
+	# sr_dat = subset(sr_dat, elevation>=el_real[1] & elevation<=el_real[5])
+	# sr_gam = gam(survival~bg+s(elevation,k=kn[sp])+s(year,bs="re"),family=binomial(link='logit'), data=sr_dat)
+	# sr_tmp=as.vector(predict.gam(sr_gam, newdata=data.frame(xx,bg = "B"),type= "response"))
+
+	###2) Survival conditione only on non-competition sites
+	sr_dat=subset(allsp, bg =='B')	
 	sr_dat = subset(sr_dat, elevation>=el_real[1] & elevation<=el_real[5])
-	#sr[sp] = mean(allB2$survival)
 	sr_gam = gam(survival~s(elevation,k=kn[sp])+s(year,bs="re"),family=binomial(link='logit'), data=sr_dat)
 	sr_tmp=as.vector(predict.gam(sr_gam, newdata=xx,type= "response"))
+
 	#Remove 0s
 	sr_tmp[sr_tmp<0] = 0
 	sr_krigB[,sp] = sr_tmp
 	sr_probB[[sp]] = sr_gam
+
+	### Raw survival probabilities
+ 	raw_sr= table(sr_dat$survival,sr_dat$elevation)
+ 	raw_sr = as.data.frame(raw_sr/matrix(colSums(raw_sr),2,dim(raw_sr)[2],byrow=T ))
+	raw_sr = subset(raw_sr, Var1 == 1 )
+	raw_sr[,1] = as.numeric(levels(raw_sr[,1]))[raw_sr[,1]]
+	raw_sr[,2] = as.numeric(levels(raw_sr[,2]))[raw_sr[,2]]
+	raw_sr_all[[sp]] = raw_sr
+
 }
 
 #Plot kriged values
@@ -683,7 +745,10 @@ for(sp in 1:length(spp)){
 #Or take the average (since there's not that much variation), but load the
 #other function file:
 sr=colMeans(sr_krigB[800:2000,])
-sr[3]=sr[3]+0.05
+#sr[3]=sr[3]+0.05
+
+#From raw probability data: 
+#sr =c(mean(raw_sr_all[[1]][,3]), mean(raw_sr_all[[2]][,3]), mean(raw_sr_all[[3]][,3]))
 
 ###Competition coeffcients
 #3B is calculating a per-site alpha, then averaging 
@@ -1098,21 +1163,21 @@ for( t in 1: ngenst){
 		kuse = sum(kn[1:nvar])
 		beta = matrix(0, 1, (kuse+nvar*nk) )
 		pnk = nk/2
-		kc=0
+		knc=0
 		for( b in 1:nvar){
-			if(b>1) {kc = sum(kn[1:(b-1)])}
-			bpos = (b-1)*(nk)+kc+pnk+1
-			kpos = kc+1 #Intercept removed from rr_gam
+			if(b>1) {knc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+knc+pnk+1
+			kpos = knc+1 #Intercept removed from rr_gam
 			beta[ bpos:(bpos+kn[b]-1)] = coef(rr_gam) [kpos:(kpos+kn[b]-1)]
 		} 
 
 		### prediction matrix
 		Xp = matrix(0, dim(xx_new)[1], (kuse+nvar*nk))
 		#Xp = matrix(0, dim(dat)[1], nvar*(kuse+nk))
-		kc=0
+		knc=0
 		for( b in 1:nvar){
-			if(b>1) {kc = sum(kn[1:(b-1)])}
-			bpos = (b-1)*(nk)+kc+pnk
+			if(b>1) {knc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+knc+pnk
 			Xp_tmp = PredictMat(sm[[b]], xx_new)
 			#Xp_tmp = PredictMat(sm[[b]], dat)
 			Xp[,bpos:(bpos+kn[b]+nk-1)] = Xp_tmp
@@ -1306,21 +1371,21 @@ for( t in 1: ngenst){
 		kuse = sum(kn[1:nvar])
 		beta = matrix(0, 1, (kuse+nvar*nk) )
 		pnk = nk/2
-		kc=0
+		knc=0
 		for( b in 1:nvar){
-			if(b>1) {kc = sum(kn[1:(b-1)])}
-			bpos = (b-1)*(nk)+kc+pnk+1
-			kpos = kc+1 #Intercept removed from rr_gam
+			if(b>1) {knc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+knc+pnk+1
+			kpos = knc+1 #Intercept removed from rr_gam
 			beta[ bpos:(bpos+kn[b]-1)] = coef(rr_gam) [kpos:(kpos+kn[b]-1)]
 		} 
 
 		### prediction matrix
 		Xp = matrix(0, dim(xx_new)[1], (kuse+nvar*nk))
 		#Xp = matrix(0, dim(dat)[1], nvar*(kuse+nk))
-		kc=0
+		knc=0
 		for( b in 1:nvar){
-			if(b>1) {kc = sum(kn[1:(b-1)])}
-			bpos = (b-1)*(nk)+kc+pnk
+			if(b>1) {knc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+knc+pnk
 			Xp_tmp = PredictMat(sm[[b]], xx_new)
 			#Xp_tmp = PredictMat(sm[[b]], dat)
 			Xp[,bpos:(bpos+kn[b]+nk-1)] = Xp_tmp
@@ -1376,8 +1441,8 @@ for( t in 1: ngenst){
 	Frs[t,,1] = Frs[t,,1]*3
 
 
-	fig.name = paste("calanda_ranges",paste(v_use[-1],collapse=""),".pdf",sep="")
-	pdf(file=fig.name, height=11, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
+	# fig.name = paste("calanda_ranges",paste(v_use[-1],collapse=""),".pdf",sep="")
+	# pdf(file=fig.name, height=11, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
 	col_use = c("black","red","blue")
 	par(mfrow=c(3,1))
 	plot(Frs[t,,2],t="l")
@@ -1397,7 +1462,7 @@ for( t in 1: ngenst){
 	}
 
 
-	dev.off()
+	#dev.off()
 	
 	# #Frs[t,,1] = Frs[t,,1]*8
 	# for (sp in 1:length(spp)) {
@@ -1607,7 +1672,7 @@ for( t in 1: ngenst){
 	#positive LDG are allowed to equilibrate
 	#=============================================================================
 
-
+	print(ldg.sim[t,])
 	s.index1= 1:nspp
 	burns=500
 	#Equilibrium populations of all spp. Columns represent space, rows are time. 
@@ -1662,239 +1727,3 @@ save(file=file.name, "l1", "D", "var_mu_Us","cov_e_mu_Us",
 "cov_lam_vc", "cov_lam_vc2", "Elam1", "Elam2", "gr1.n", "gr1", "y.full", 
 "w.eq.full","ldg.sim", "ldgIMP.sim", "covIMP.sim", "Frs", "env_analogue_all",
 "sim.impacts", "sim.impactsIMP","covIMP.impacts","lded","nf","is.final","Frs_ci")
-
-
-#=============================================================================
-#BIOMASS
-#=============================================================================
-
-#Calculate rr (intrinsic growth) from biomass measures of plants grown alone, 
-#per site 
-#Calculate average intraspecific invasion growth rate (biomass) per site
-#Calculate resident stationary distribution from intraspecific competition
-#Get competition (biomass) per site
-#Calculate full invasion growth rate. 
-
-
-#=============================================================================
-#PLOTS
-#=============================================================================
-epoints = match( elevations,xx$elevation)
-
-fig.name = paste("seeds_kriged.pdf",sep="")
-pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-#par(mfrow=c(1,1),mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75))
-ylim=c(-1,30)
-plot(xx$elevation, rr_krig[,1], t="l", ylab="Seeds (per-capita, Kriged) ", xlab="Elevation", xaxs="i",yaxs="i",cex.main=1.3,cex.lab=1.3,ylim=ylim)
-lines(xx$elevation, rr_krig[,1])
-lines(xx$elevation, rr_krig[,2],col="red")
-lines(xx$elevation, rr_krig[,3],col="blue")
-abline(v=c(elevations),lwd=10,col="grey80")
-points(xx$elevation[epoints], rr_krig[epoints,1])
-points(xx$elevation[epoints], rr_krig[epoints,2],col="red")
-points(xx$elevation[epoints], rr_krig[epoints,3],col="blue")
-
-dev.off()
-#=============================================================================
-
-epoints = match( elevations,xx$elevation)
-
-fig.name = paste("seeds_kriged2040.pdf",sep="")
-pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-#par(mfrow=c(1,1),mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75))
-ylim=c(-1,70)
-plot(xx$elevation, Frs[1,,1], t="l", ylab="Seeds (per-capita, Kriged) ", xlab="Elevation", xaxs="i",yaxs="i",cex.main=1.3,cex.lab=1.3,ylim=ylim)
-lines(xx$elevation, Frs[1,,1])
-lines(xx$elevation, Frs[1,,2],col="red")
-lines(xx$elevation, Frs[1,,3],col="blue")
-abline(v=c(elevations),lwd=10,col="grey80")
-points(xx$elevation[epoints], Frs[1,epoints,1])
-points(xx$elevation[epoints], Frs[1,epoints,2],col="red")
-points(xx$elevation[epoints], Frs[1,epoints,3],col="blue")
-
-f1 = flower_prob_act*flower_act
-points(xx$elevation[epoints], f1[,1],pch=3)
-points(xx$elevation[epoints], f1[,2],col="red",pch=3)
-points(xx$elevation[epoints], f1[,3],col="blue",pch=3)
-
-
-dev.off()
-
-
-
-#plot(xx$elevation, rr_krig[,2])
-#plot(xx$elevation, rr_krig[,3])
-#=============================================================================
-fig.name = paste("intraLR_kriged.pdf",sep="")
-pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-ylim=c(-1,6)
-plot(xx$elevation, lrr_krig[,1], t="l", ylab="Seeds (per-capita, Kriged) ", xlab="Elevation", xaxs="i",yaxs="i",cex.main=1.3,cex.lab=1.3,ylim=ylim)
-lines(xx$elevation, lrr_krig[,1])
-lines(xx$elevation, lrr_krig[,2],col="red")
-lines(xx$elevation, lrr_krig[,3],col="blue")
-abline(v=c(elevations),lwd=10,col="grey80")
-points(xx$elevation[epoints], lrr_krig[epoints,1])
-points(xx$elevation[epoints], lrr_krig[epoints,2],col="red")
-points(xx$elevation[epoints], lrr_krig[epoints,3],col="blue")
-
-dev.off()
-
-
-#=============================================================================
-#fig.name = paste("all4pairs_linear_widthOverlap_2Dgr4.pdf",sep="")
-#pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-par(mfrow=c(3,1),mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75)))
-plot(xx$elevation, sr_krig[,1])
-plot(xx$elevation, sr_krig[,2])
-plot(xx$elevation, sr_krig[,3])
-#=============================================================================
-#fig.name = paste("all4pairs_linear_widthOverlap_2Dgr4.pdf",sep="")
-#pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-par(mfrow=c(3,1),mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75)))
-plot(xx$elevation, surv_spp[1]+lrr_krig[,1])
-plot(xx$elevation, surv_spp[2]+lrr_krig[,2])
-plot(xx$elevation, surv_spp[3]+lrr_krig[,3])
-#=============================================================================
-#fig.name = paste("all4pairs_linear_widthOverlap_2Dgr4.pdf",sep="")
-#pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-par(mfrow=c(3,1),mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75)))
-plot(xx$elevation, Crr_krig[,1])
-plot(xx$elevation, Crr_krig[,2])
-plot(xx$elevation, Crr_krig[,3])
-#=============================================================================
-fig.name = paste("interLR_kriged.pdf",sep="")
-pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-par(mfrow=c(3,1))
-col_use = c("black","red", "blue")
-ylimits = matrix(c(0,15,0,8,0,1.5),3,2, byrow=T)
-for(s in 1:length(spp)){
-		sp_use = 1:(length(spp))
-		sp_use= sp_use[-s]
-		col1 = col_use[-s]	
-
-		plot(xx$elevation, lii_all[[s]][[1]][,1], col= col1[1], t="l", ylab="Seeds (per-capita, Kriged) ", xlab="Elevation", xaxs="i",yaxs="i",cex.main=1.3,cex.lab=1.3,ylim=ylimits[s,])
-		m1 = matrix(0,5,1)
-		lines(xx$elevation, lii_all[[s]][[1]][,2],col=col1[2])
-		abline(v=c(elevations),lwd=10,col="grey80")
-		points(xx$elevation[epoints], lii_all[[s]][[1]][epoints,1],col=col1[1])
-		points(xx$elevation[epoints], lii_all[[s]][[1]][epoints,2],col=col1[2])
-		#for(sp in 1:2){
-		# for(ee in 1:5){
-		# 	m1[ee] = mean(subset(allB2, Sp == spp[s] & bg == substr(as.character(spp[sp_use[sp]]),1,1) & elevation == elevations[ee])$nr.inflor,na.rm=T)
-		# 	}
-		# points(elevations,m1)
-}	
-
-dev.off()
-#=============================================================================
-#fig.name = paste("all4pairs_linear_widthOverlap_2Dgr4.pdf",sep="")
-#pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-fig.name = paste("arat1_kriged.pdf",sep="")
-pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-par(mfrow=c(3,1))
-col_use = c("black","red", "blue")
-ylimits = matrix(c(0,1,0,5,0,5),3,2, byrow=T)
-for(s in 1:length(spp)){
-		sp_use = 1:(length(spp))
-		sp_use= sp_use[-s]
-		col1 = col_use[-s]	
-
-		plot(xx$elevation, arat_all[[s]][[1]][,1], col= col1[1], t="l", ylab="Seeds (per-capita, Kriged) ", xlab="Elevation", xaxs="i",yaxs="i",cex.main=1.3,cex.lab=1.3,ylim=ylimits[s,])
-		m1 = matrix(0,5,1)
-		lines(xx$elevation, arat_all[[s]][[1]][,2],col=col1[2])
-		abline(v=c(elevations),lwd=10,col="grey80")
-		points(xx$elevation[epoints],arat_all[[s]][[1]][epoints,1],col=col1[1])
-		points(xx$elevation[epoints], arat_all[[s]][[1]][epoints,2],col=col1[2])
-		#for(sp in 1:2){
-		# for(ee in 1:5){
-		# 	m1[ee] = mean(subset(allB2, Sp == spp[s] & bg == substr(as.character(spp[sp_use[sp]]),1,1) & elevation == elevations[ee])$nr.inflor,na.rm=T)
-		# 	}
-		# points(elevations,m1)
-	}	
-dev.off()
-
-
-#=============================================================================
-#fig.name = paste("all4pairs_linear_widthOverlap_2Dgr4.pdf",sep="")
-#pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-par(mfrow=c(3,2),mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75)))
-for(s in 1:length(spp)){
-		sp_use = 1:(length(spp))
-		sp_use= sp_use[-sp]
-
-	for(sp in 1:2){ 
-		plot(xx$elevation, arat_all2[[s]][[1]][,sp])
-		print(median( arat_all2[[s]][[1]][,sp],na.rm=T ))
-				
-}}	
-#=============================================================================
-#fig.name = paste("all4pairs_linear_widthOverlap_2Dgr4.pdf",sep="")
-#pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-par(mfrow=c(3,2),mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75)))
-for(s in 1:length(spp)){
-		sp_use = 1:(length(spp))
-		sp_use= sp_use[-sp]
-
-	for(sp in 1:2){ 
-		plot(xx$elevation, arat_all[[s]][[1]][,sp])
-		points(xx$elevation, arat_all2[[s]][[1]][,sp],col="red")
-		#print(median( arat_all[[s]][[1]][,sp],na.rm=T ))
-				
-}}	
-	
-#=============================================================================
-#fig.name = paste("all4pairs_linear_widthOverlap_2Dgr4.pdf",sep="")
-#pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-par(mfrow=c(3,2),mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75)))
-for(s in 1:length(spp)){
-		sp_use = 1:(length(spp))
-		sp_use= sp_use[-sp]
-
-	for(sp in 1:2){ 
-		plot(xx$elevation, Cir_all[[s]][[1]][,sp])
-		m1 = matrix(0,5,1)
-
-		for(ee in 1:5){
-			m1[ee] = mean(subset(allB2, Sp == spp[s] & bg == substr(as.character(spp[sp_use[sp]]),1,1) & elevation == elevations[ee])$inter_flor,na.rm=T)
-			}
-		points(elevations,m1)
-}}	
-#=============================================================================
-#fig.name = paste("all4pairs_linear_widthOverlap_2Dgr4.pdf",sep="")
-#pdf(file=fig.name, height=7.5, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-
-par(mfrow=c(3,2),mai= c( 1, 0, 0.2, 0), omi=c(2,0.75,2,0.75)))
-for(s in 1:length(spp)){
-		sp_use = 1:(length(spp))
-		sp_use= sp_use[-sp]
-
-	for(sp in 1:2){ 
-		plot(xx$elevation, Cir_all[[s]][[1]][,sp])
-		m1 = matrix(0,5,1)
-
-		for(ee in 1:5){
-			m1[ee] = mean(subset(allB2, Sp == spp[s] & bg == substr(as.character(spp[sp_use[sp]]),1,1) & elevation == elevations[ee])$inter_flor,na.rm=T)
-			}
-		points(elevations,m1)
-}}	
-
-#=============================================================================
-
-
-sub1=((lrr_krig[,sb]) - surv_spp[sb]) / 
-(surv_spp[sp] - ((lii_all[[sp]][[1]][,sb])))
-sub2 =(-surv_spp[sp]+(lii_all[[sp]][[1]][,sb]) - rr_krig[,sp])/		
-(surv_spp[sb]-(lrr_krig[,sb]) + rr_krig[,sb])
-

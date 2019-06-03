@@ -8,53 +8,57 @@
 # The main loop of this code increments over yearly changes in environmental
 # conditions taken from one of two IPCC scenarios that bookend expectations 
 # (2.6 and 8.5). 
+#
+# NOTE: THIS IS THE FAST VERSION, i.e. population spread rates determine the 
+# the size of the intrinsic range. The version of this code without "fast" in
+# in the name is the normal version. 
 # 
 # 1. Underlying environmental data come from a combination of sources: HOBO
-#  data loggers placed in the field from 2015 -2017, and TerraClimate maps.
-#  See calanda_env2017B_2.R for the pre-processing approach to these data. 
-#  Here, the data are assumed to be available already in the main data
-#  variable (allB2). These data are loaded and fit by simple GAMMs (with 
-#  year included as a random effect) with elevation as the only covariate,
-#  which are used to interpolate the environmental variables at a finer 
-#  spatial scale.
+#	 data loggers placed in the field from 2015 -2017, and TerraClimate maps.
+#	 See calanda_env2017B_2.R for the pre-processing approach to these data. 
+#	 Here, the data are assumed to be available already in the main data
+#	 variable (allB2). These data are loaded and fit by simple GAMMs (with 
+#	 year included as a random effect) with elevation as the only covariate,
+#	 which are used to interpolate the environmental variables at a finer 
+#	 spatial scale.
 # 
 # 2. Survival is fit by a GAMM (year as a random effect) to look for significant
-#  variation over elevation. Since it is fairly minimal over the sampled 
-#  elevation range (1000-2000m) an average value is used in the Leslie-Gower
+#	 variation over elevation. Since it is fairly minimal over the sampled 
+#	 elevation range (1000-2000m) an average value is used in the Leslie-Gower
 #    model. 
 # 
 # 3. Competition coefficients are fit through a combination of bootstrapping 
-#  and NLS. See calanda_stats_tests1.R for an exploration of different 
-#  approaches for finding the competition coefficients. 
+#	 and NLS. See calanda_stats_tests1.R for an exploration of different 
+#	 approaches for finding the competition coefficients. 
 #
 # 4. Dispersal kernels are based on the WALD approach (Katul, G. G., et al. 2005. 
 #    Mechanistic Analytical Models for Long‐Distance Seed Dispersal by Wind. 
-#  The American Naturalist 166:368–381). This requires calculating the height
-#  of plants from field measurements. Average height is used across sampled
-#  elevations. A number of other parameters are determined either from the 
-#  primary literature or field measurements of wind. See wald_functions1.R for 
+#	 The American Naturalist 166:368–381). This requires calculating the height
+#	 of plants from field measurements. Average height is used across sampled
+#	 elevations. A number of other parameters are determined either from the 
+#	 primary literature or field measurements of wind. See wald_functions1.R for 
 #    more information and references. 
 #
 # 5. Intrinsic ranges are calculated as a product of two separate underlying 
-#    processes: probability of flowering, and number of flowers. Each process
-#  is fit using a GAMM (year as a random effect). Intrinsic ranges can be 
-#  fit with a number of environmental covariates, and this code allows a number
-#  of combinations. However, the covariates of primary interest are the 
+# 	 processes: probability of flowering, and number of flowers. Each process
+#	 is fit using a GAMM (year as a random effect). Intrinsic ranges can be 
+#	 fit with a number of environmental covariates, and this code allows a number
+#	 of combinations. However, the covariates of primary interest are the 
 #    mean growing season temp, min temp, number of growing degree days (GDD), 
-#  and monthly average soil moisture. In order to produce nice ranges that
-#  taper towards zero at range margins, the underlying smooth fits of covariates
-#  have been constrained to go to 0 at upper and lower intervals. This has 
-#  necessitated writing a bit of additional code by hand. 
+#	 and monthly average soil moisture. In order to produce nice ranges that
+#	 taper towards zero at range margins, the underlying smooth fits of covariates
+#	 have been constrained to go to 0 at upper and lower intervals. This has 
+#	 necessitated writing a bit of additional code by hand. 
 #    
-#  Range shifts are modeled by using the GAMMs (which have been fit to baseline 
+#	 Range shifts are modeled by using the GAMMs (which have been fit to baseline 
 #    conditions) to project a new range given the underlying change in covariates 
 #    with each IPCC scenario. 
 #
 # 6. Coexistence is calculated and the coexistence mehanisms are parsed out in 
-#  two phases. Resident stationary distributions are calculate, and the invader
+#	 two phases. Resident stationary distributions are calculate, and the invader
 #    low-density stationary distribution is calculated. A combination of analytical
-#  approximations and simulations are used to calculate the LDG and the 
-#  fitness-density covariance. See range_coexistence_functionsWALD.R. 
+#	 approximations and simulations are used to calculate the LDG and the 
+#	 fitness-density covariance. See range_coexistence_functionsWALD.R. 
 #
 # 7. The full community stationary distribution is calculted numerically. 
 #=============================================================================
@@ -88,8 +92,12 @@ options(glmerControl=list(check.nobs.vs.rankZ = "warning",
 #=============================================================================
 #For naming files
 #=============================================================================
-#f.name1=c("calanda_ccs26B_tsmfull3_2017")
-f.name1=c("calanda_ccs85B_tsmfull3_2017")
+#f.name1=c("calanda_ccs26_temp2_2017")
+f.name1=c("calanda_ccs26_tsm2_fastpt1_2017")
+#f.name1=c("calanda_ccs26_tsmfull2_2017")
+#f.name1=c("calanda_ccs85_temp2_2017")
+#f.name1=c("calanda_ccs85_tsm2_fast_2017")
+#f.name1=c("calanda_ccs85_tsmfull2_2017")
 #=============================================================================
 #Data: (see calanda2017.R)
 #=============================================================================
@@ -97,11 +105,11 @@ load(file="calanda_allB2017_2.var")
 rm(allB)
 
 #With climate-change scenarios:
-ccs_temp = read.csv("rcp85_2019_2100.csv")[2:3]
-#ccs_temp = read.csv("rcp26_2019_2100.csv")[2:3]
+#ccs_temp = read.csv("rcp85_2019_2100.csv")[2:3]
+ccs_temp = read.csv("rcp26_2019_2100.csv")[2:3]
 
-ccs_soil = read.csv("rcp85_mrso_2019_2100.csv")[1:2]
-#ccs_soil = read.csv("rcp26_mrso_2019_2100.csv")[1:2]
+#ccs_soil = read.csv("rcp85_mrso_2019_2100.csv")[1:2]
+ccs_soil = read.csv("rcp26_mrso_2019_2100.csv")[1:2]
 
 #=============================================================================
 #Some necessary tweaks to the data set to fix various things 
@@ -240,28 +248,33 @@ allB2=data.frame(allB2, year_numeric = as.numeric(allB2$year))
 variable_mat = colnames(allB2)[c(14,17,30,32,33,34,37)]
 
 # Control which variables to use. Should include at least year and mean temp
-# In this version of the code, 2 per-species lists are made: 
-# One for the flowering probability
-# One for the number of flowers 
-# The elements of the lists are based on AIC to find best model 
-v_use_flo = list( 
-	variable_mat[c(2,4,6,7)], #Sp1: Temp + soil moisture+min_temp
-	variable_mat[c(2,3,6,7)], #Sp2: Temp + soil moisture+max_gdd
-	variable_mat[c(2,3,4,6,7)] #Sp3: Temp + soil moisture + max_gdd+ gs_min_temp 
-)
+#v_use= variable_mat[c(2,6)] #Temp only 
+#v_use= variable_mat[c(2,7)] #Soil moisture only 	
+v_use= variable_mat[c(2,6,7)] #Temp + soil moisture
+#v_use= variable_mat[c(2,4,6,7)] #Temp + soil moisture+min_temp
+#v_use= variable_mat[c(2,3,6,7)] #Temp + soil moisture+max_gdd
+#v_use= variable_mat[c(2,3,4,6,7)] #Temp + soil moisture + max_gdd+ gs_mean_temp 
+#v_use= variable_mat[c(2,1,3,4,6,7)] #elevation+Temp + soil moisture + max_gdd+ gs_mean_temp 
 
-v_use_rr = list( 
-	variable_mat[c(2,3,6,7)], #Sp1: Temp + soil moisture + gs_min_temp 
-	variable_mat[c(2,3,4,6,7)], #Sp2: Temp + soil moisture + max_gdd+ gs_min_temp 
-	variable_mat[c(2,3,6,7)] #Sp3: Temp + soil moisture+max_gdd
-)
+nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
+
+#Speces-specific, variable-specific knots for smooth fits.
+#These are based on analysis of underlying factor fits (see file: )
+#Each species has 2 columns, one for flower probability model and one for total
+#flowers model:
+
+dgk = matrix(3,5,2); axk = dgk; hnk = dgk
+dgk[2,1] = 2 #Soil moisture for DG prob
+#axk[2,1] = 5 #Soil moisture for AX prob
+#hnk[2:3,1] = 5 #Soil moisture and min temp for HN prob
+var_spp_knots = list(dgk,axk,hnk)
 
 #=============================================================================
 #Tunable lattice parameters (space and time)
 #=============================================================================
 #If fast.bys = TRUE, then populations will be allowed to spread and track their
 #intrinsic ranges. 
-fast.bys=FALSE
+fast.bys=TRUE
 c.tol = 1e-2 #Tolerance for finite inidividuals, sets left/right range edges
 
 #For the climate change scenarios, tune the change in temp to the current 
@@ -276,8 +289,8 @@ ccs_soil = ccs_soil[,2]- soil_field - (ccs_soil[1,2]-soil_field)
 
 #For standard increments of time through the ccs: 
 tstart = 1
-tstop = 61
-tinc = 10
+tstop =length(ccs_temp)
+tinc = 1
 ttot= ceiling((tstop-tstart)/tinc)
 
 ngens=ttot #Number of generations for environmental change
@@ -430,6 +443,7 @@ xx0=matrix(seq((-ns/2),(ns/2)))
 np=length(xx0)
 ngenst=iconfig+ngens
 
+
 #=============================================================================
 #survival 
 #=============================================================================
@@ -448,7 +462,6 @@ for(sp in 1:length(spp)){
 	sr_dat=subset(allsp, bg =='B')
 	sr_dat = subset(sr_dat, elevation>=el_real[1] & elevation<=el_real[5])
 	#sr[sp] = mean(allB2$survival)
-	#sr_gam = gam(survival~year_numeric+s(elevation,k=kn[sp])+s(year,bs="re"),family=binomial(link='logit'), data=sr_dat)
 	sr_gam = gam(survival~s(elevation,k=kn[sp])+s(year,bs="re"),family=binomial(link='logit'), data=sr_dat)
 	sr_tmp=as.vector(predict.gam(sr_gam, newdata=xx,type= "response"))
 	#Remove 0s
@@ -463,7 +476,6 @@ for(sp in 1:3) {
 	plot(sr_krigB[,sp],ylim=c(0,1))
 	#points(sr_krig[,sp],col="red")
 }
-
 
 
 #=============================================================================
@@ -967,7 +979,8 @@ env_var = vector(ttot, mode="list")
 #Keep track of total interspecific competition of species when it is invader
 cc=array(c(matrix(0,ngenst,np),matrix(0,ngenst,np)),dim=c(ngenst,np,nspp)) 
 
-for( t in 1: ngenst){ 
+#t=20
+for( t in 20: ngenst){ 
 
 	#set.seed(2)
 	ti = seq(tstart,tstop,tinc)[t]
@@ -1011,11 +1024,6 @@ for( t in 1: ngenst){
 	flower_prob_post=NULL
 	flower_prob_act = matrix(0,length(el_real),3)
 
-	kn = c(3,3,3)
-
-	env_distance_spp=list()
-	env_analogue_spp=list()
-
 	for(sp in 1:length(spp)){
 		allsp = subset(allB2, Sp == spp[sp])
 		rr_dat =subset(allsp, bg =='B')
@@ -1028,34 +1036,20 @@ for( t in 1: ngenst){
 			rr_dat$nr.inflor = rr_dat$nr.inflor*rr_dat$stalks	
 		}
 
-		### Find the elevation at which flowering peaks, then get the 
-		### average value of variables corresponding to the peak elevation. 
-	
-		#What are actual per-site probs? At which elevation does the
-		#peak occur? 
-		for (n in 1:length(el_real)) { 
-			tfp = subset(rr_dat, elevation == el_real[n])
-			#flower_prob_act[n,sp]= sum(tfp$flyes)/nrow(tfp)}
-			flower_prob_act[n,sp]= sum(tfp$flyes)
-		} #sum(tfp$flyes)/nrow(tfp)}
-		
-
 		### Make three important lists: spline fits, knots, penalty matrixes
 		sm=list()
 		knots_sm = list()
 		para_pen = list()
 
 		#Build the main data set with all of the variables
-		v_use = v_use_flo[[sp]]
-		nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
 		y = c(matrix(0, 1,1),rr_dat$flyes,matrix(0, 1,1))
 		yearx=unlist(list( factor(matrix(years,1,1)),rr_dat$year,factor(matrix(years,1,1))))
-
 		dat = data.frame (flyes = rr_dat$flyes, rr_dat[paste(v_use[(1:length(v_use))])])
 		dzeros = data.frame ( matrix(0, 1, ncol(dat)))
 		colnames(dzeros) = colnames(dat)
 		dat = rbind(dzeros,dat,dzeros)
 		dat$year = yearx
+
 		for( v in 1:nvar){ 
 			#Pick out the variable of interest:
 			iv_name = paste("rr_dat[[\"",v_use[(v+1)],"\"]]", sep="")
@@ -1067,7 +1061,7 @@ for( t in 1: ngenst){
 			#### Ensuring that smooth fits taper to 0 at upper and lower values
 			#By default, mgcv::gam places a knot at the extremes of the data and then the 
 			#remaining "knots" are spread evenly over the interval.
-			kuse= kn[sp] #Effectively the number of knots
+			kuse= var_spp_knots[[sp]][v,1] #Effectively the number of knots
 			nk = 2 #How many knots to add at ends to contstrain smooth? 
 			k1 = unique(iv1)
 			knots = seq(min(k1),max(k1),length=kuse)
@@ -1125,7 +1119,7 @@ for( t in 1: ngenst){
 		for (f in 1:nvar){
 			factors[f] = paste("X", f, sep="")
 			#factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp], ",  bs=\"cr\")", sep="")
-			factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp]+nk, ",  bs=\"cr\")", sep="")
+			factors2[f] = paste("s(",v_use[(f+1)], ", k = ", var_spp_knots[[sp]][f,1]+nk, ",  bs=\"cr\")", sep="")
 			#factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp]+nk, ")", sep="")
 
 		} 
@@ -1138,8 +1132,12 @@ for( t in 1: ngenst){
 		off = dat$flyes*0 + cp_y[1] ## offset term to force curve through a point
 
 		rr_gam = gam(as.formula(paste("flyes~", paste( paste(factors, collapse="+"),"+offset(off)+s(year, bs=\"re\")-1"))), 
-			paraPen=para_pen, data=dat, family=binomial(link='logit'),method = "REML")
+			paraPen=para_pen, data=dat, family=binomial(link='logit'),method = "REML" )
+		# rr_gam = gam(as.formula(paste("flyes~", paste( paste(factors, collapse="+"),"+offset(off)+s(year, bs=\"re\")-1"))), 
+		# 	paraPen=para_pen, data=dat, family=binomial(link='logit'))
+	
 		rr_tmp = predict(rr_gam, exclude = "s(year)")
+		#rr_tmp = predict(rr_gam, type="response", exclude = "s(year)")
 		
 		### coefficients from the penalized regression	
 		# ncs = c(0,0)
@@ -1147,23 +1145,28 @@ for( t in 1: ngenst){
 		# if (coef(rr_gam)[(kuse+1)]>=0){ ncs[2] = 0} else {ncs[2] = min(coef(rr_gam)[2:(kuse+1)])}
 		# #beta = c(ncs[1],coef(rr_gam)[2:(kuse+1)],ncs[2])
 		#beta = c(0,coef(rr_gam)[2:(kuse+1)],0) #With intercept
-		beta = matrix(0, 1, (kuse*nvar+nvar*nk) )
+		kn = var_spp_knots[[sp]][ ,1]
+		kuse = sum(kn[1:nvar])
+		beta = matrix(0, 1, (kuse+nvar*nk) )
 		pnk = nk/2
+		knc=0
 		for( b in 1:nvar){
-			bpos = (b-1)*(kuse+nk)+pnk+1
-			kpos = (b-1)*kuse+1 #Intercept removed from rr_gam
-			beta[ bpos:(bpos+kuse-1)] = coef(rr_gam) [kpos:(kpos+kuse-1)]
+			if(b>1) {knc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+knc+pnk+1
+			kpos = knc+1 #Intercept removed from rr_gam
+			beta[ bpos:(bpos+kn[b]-1)] = coef(rr_gam) [kpos:(kpos+kn[b]-1)]
 		} 
 
 		### prediction matrix
-		Xp = matrix(0, dim(xx_new)[1], nvar*(kuse+nk))
+		Xp = matrix(0, dim(xx_new)[1], (kuse+nvar*nk))
 		#Xp = matrix(0, dim(dat)[1], nvar*(kuse+nk))
-
+		knc=0
 		for( b in 1:nvar){
-			kpos = (b-1)*(kuse+nk)+1
+			if(b>1) {knc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+knc+pnk
 			Xp_tmp = PredictMat(sm[[b]], xx_new)
 			#Xp_tmp = PredictMat(sm[[b]], dat)
-			Xp[,kpos:(kpos+nk+kuse-1)] = Xp_tmp
+			Xp[,bpos:(bpos+kn[b]+nk-1)] = Xp_tmp
 		}
 		
 
@@ -1210,7 +1213,6 @@ for( t in 1: ngenst){
 	rr_gams=NULL
 	rr_post = NULL
 
-	kn = c(3,3,3)
 	flower_act =matrix(0,length(el_real),3)
 
 	for(sp in 1:length(spp)){
@@ -1225,12 +1227,13 @@ for( t in 1: ngenst){
 			rr_dat$nr.inflor = rr_dat$nr.inflor*rr_dat$stalks	
 		}
 
-		
+
 		for (n in 1:length(el_real)) { 
 			tfp = subset(rr_dat, elevation == elevations[n])
 			flower_act[n,sp]= mean(tfp$nr.inflor,na.rm=T)
 		}
 		flower_act[,sp][is.na(flower_act[,sp])] = 0
+
 
 		### Make three important lists: spline fits, knots, penalty matrixes
 		sm=list()
@@ -1238,9 +1241,6 @@ for( t in 1: ngenst){
 		para_pen = list()
 
 		#Build the main data set with all of the variables
-		v_use = v_use_rr[[sp]]
-		nvar = length(v_use)-1 # Exclude year from this, as it will always be a r.e.
-
 		y = c(matrix(0, 1,1),rr_dat$nr.inflor,matrix(0, 1,1))
 		yearx=unlist(list( factor(matrix(years,1,1)),rr_dat$year,factor(matrix(years,1,1))))
 		dat = data.frame (nr.inflor = rr_dat$nr.inflor, rr_dat[paste(v_use[(1:length(v_use))])])
@@ -1272,7 +1272,7 @@ for( t in 1: ngenst){
 			#### Ensuring that smooth fits taper to 0 at upper and lower values
 			#By default, mgcv::gam places a knot at the extremes of the data and then the 
 			#remaining "knots" are spread evenly over the interval.
-			kuse= kn[sp] #Effectively the number of knots
+			kuse= var_spp_knots[[sp]][v,2] #Effectively the number of knots
 			nk = 2 #How many knots to add at ends to contstrain smooth? 
 			k1 = unique(iv1)
 			knots = seq(min(k1),max(k1),length=kuse)
@@ -1329,7 +1329,7 @@ for( t in 1: ngenst){
 		for (f in 1:nvar){
 			factors[f] = paste("X", f, sep="")
 			#factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp], ",  bs=\"cr\")", sep="")
-			factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp]+nk, ",  bs=\"cr\")", sep="")
+			factors2[f] = paste("s(",v_use[(f+1)], ", k = ",var_spp_knots[[sp]][f,2]+nk, ",  bs=\"cr\")", sep="")
 			#factors2[f] = paste("s(",v_use[(f+1)], ", k = ", kn[sp]+nk, ")", sep="")
 
 		} 
@@ -1342,8 +1342,9 @@ for( t in 1: ngenst){
 		off = dat$nr.inflor*0 + cp_y[1] ## offset term to force curve through a point
 
 		rr_gam= gam(as.formula(paste("nr.inflor~", paste( paste(factors, collapse="+"),"+offset(off)+s(year, bs=\"re\")-1"))), 
-			paraPen=para_pen, data=dat,method = "REML")
-
+			 paraPen=para_pen, data=dat,method = "REML")
+		# rr_gam= gam(as.formula(paste("nr.inflor~", paste( paste(factors, collapse="+"),"+offset(off)+s(year, bs=\"re\")-1"))), 
+		# 	paraPen=para_pen, data=dat)
 		rr_tmp = predict(rr_gam, exclude = "s(year)")
 	
 		### coefficients from the penalized regression	
@@ -1352,28 +1353,33 @@ for( t in 1: ngenst){
 		# if (coef(rr_gam)[(kuse+1)]>=0){ ncs[2] = 0} else {ncs[2] = min(coef(rr_gam)[2:(kuse+1)])}
 		# #beta = c(ncs[1],coef(rr_gam)[2:(kuse+1)],ncs[2])
 		#beta = c(0,coef(rr_gam)[2:(kuse+1)],0) #With intercept
-		beta = matrix(0, 1, (kuse*nvar+nvar*nk) )
+		kn = var_spp_knots[[sp]][ ,2]
+		kuse = sum(kn[1:nvar])
+		beta = matrix(0, 1, (kuse+nvar*nk) )
 		pnk = nk/2
+		knc=0
 		for( b in 1:nvar){
-			bpos = (b-1)*(kuse+nk)+pnk+1
-			kpos = (b-1)*kuse+1 #Intercept removed from rr_gam
-			beta[ bpos:(bpos+kuse-1)] = coef(rr_gam) [kpos:(kpos+kuse-1)]
+			if(b>1) {knc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+knc+pnk+1
+			kpos = knc+1 #Intercept removed from rr_gam
+			beta[ bpos:(bpos+kn[b]-1)] = coef(rr_gam) [kpos:(kpos+kn[b]-1)]
 		} 
-		
-		### prediction matrix
-		Xp = matrix(0, dim(xx_new)[1], nvar*(kuse+nk))
-		#Xp = matrix(0, dim(dat)[1], nvar*(kuse+nk))
 
+		### prediction matrix
+		Xp = matrix(0, dim(xx_new)[1], (kuse+nvar*nk))
+		#Xp = matrix(0, dim(dat)[1], nvar*(kuse+nk))
+		knc=0
 		for( b in 1:nvar){
-			kpos = (b-1)*(kuse+nk)+1
+			if(b>1) {knc = sum(kn[1:(b-1)])}
+			bpos = (b-1)*(nk)+knc+pnk
 			Xp_tmp = PredictMat(sm[[b]], xx_new)
 			#Xp_tmp = PredictMat(sm[[b]], dat)
-			Xp[,kpos:(kpos+nk+kuse-1)] = Xp_tmp
+			Xp[,bpos:(bpos+kn[b]+nk-1)] = Xp_tmp
 		}
 		
 		### the predicted smooth, i.e. species' distribution
 		#rr_tmp = Xp%*%beta+coef(rr_gam)[1] #These are not on the response scale
-		rr_tmp = Xp%*%t(beta)  + cp_y[1]
+		rr_tmp = Xp%*%t(beta) + cp_y[1]
 
 		#The unconstrained model: 
 		bu_tmp=as.vector(predict(b.u,newdata=xx_new,type= "response",exclude = "s(year)") )
@@ -1419,32 +1425,31 @@ for( t in 1: ngenst){
 	}
 
 	Frs[t,,1] = Frs[t,,1]*3
-  
- 
-  # fig.name = paste("calanda_ranges",paste(v_use[-1],collapse=""),".pdf",sep="")
-  # pdf(file=fig.name, height=11, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
-  col_use = c("black","red","blue")
-  par(mfrow=c(3,1))
-  plot(Frs[t,,2],t="l")
-  for (tt in 1:3){
-    lines(Frs[t,,tt],col=col_use[tt]) 
-  }
-
-  plot(flower_probK[,2],t="l",ylim=c(0,1))
-  for (tt in 1:3){
-    lines(flower_probK[,tt],col=col_use[tt])  
-  }
 
 
-  plot(rr_krig[,2],t="l")
-  for (tt in 1:3){
-    lines(rr_krig[,tt],col=col_use[tt]) 
-  }
+	# fig.name = paste("calanda_ranges",paste(v_use[-1],collapse=""),".pdf",sep="")
+	# pdf(file=fig.name, height=11, width=7.5, onefile=TRUE, family='Helvetica', pointsize=16)
+	col_use = c("black","red","blue")
+	par(mfrow=c(3,1))
+	plot(Frs[t,,2],t="l")
+	for (tt in 1:3){
+		lines(Frs[t,,tt],col=col_use[tt])	
+	}
+
+	plot(flower_probK[,2],t="l",ylim=c(0,1))
+	for (tt in 1:3){
+		lines(flower_probK[,tt],col=col_use[tt])	
+	}
 
 
-  #dev.off()
+	plot(rr_krig[,2],t="l")
+	for (tt in 1:3){
+		lines(rr_krig[,tt],col=col_use[tt])	
+	}
 
-  #dev.off()
+
+	#dev.off()
+	
 	# #Frs[t,,1] = Frs[t,,1]*8
 	# for (sp in 1:length(spp)) {
 	# 	Frs_q1 = apply(flower_prob_post[[sp]]*rr_post[[sp]], 1, quantile, c(0.025,0.975))
@@ -1453,11 +1458,7 @@ for( t in 1: ngenst){
 	# }
 	
 	# #Frs[,,1] =Frs[,,1] - matrix(apply(matrix(Frs[,,1]),2,min),np, ngenst, byrow=T)
-	# par(mfrow=c(1,1))
-	# plot(Frs[t,,1],t="l")
-	# for (tt in 2:3){
-	# 	lines(Frs[t,,tt])	
-	# }
+
 
 	# env_var[[t]] = xx_new[,env.ind] }
 
@@ -1657,40 +1658,41 @@ for( t in 1: ngenst){
 	#positive LDG are allowed to equilibrate
 	#=============================================================================
 
-	s.index1= 1:nspp
-	burns=500
-	#Equilibrium populations of all spp. Columns represent space, rows are time. 
-	nf.tmp=array(c(matrix(0.0,burns,np),matrix(0.0,burns,np)),dim=c(burns,np,nspp)) 
-	for ( sa in 1:nspp) { 
-		if (ldg.sim [t,sa] >= 1){
-		nf.tmp[1,,sa] = matrix(0.01,1,np)
-		}
-	}
 
-	#Get the stationary multispecies distribution through numerical integration
-	tcomp=0 #Condition for stationary joint distribution of community
-	ts = 1
-	comp_thresh = 2 #Sensitivity threshold. Theoretically, should be 0, but allow for numerical discrepency
+	# s.index1= 1:nspp
+	# burns=500
+	# #Equilibrium populations of all spp. Columns represent space, rows are time. 
+	# nf.tmp=array(c(matrix(0.0,burns,np),matrix(0.0,burns,np)),dim=c(burns,np,nspp)) 
+	# for ( sa in 1:nspp) { 
+	# 	if (ldg.sim [t,sa] >= 1){
+	# 	nf.tmp[1,,sa] = matrix(0.01,1,np)
+	# 	}
+	# }
 
-	while (tcomp == 0 ){
+	# #Get the stationary multispecies distribution through numerical integration
+	# tcomp=0 #Condition for stationary joint distribution of community
+	# ts = 1
+	# comp_thresh = 2 #Sensitivity threshold. Theoretically, should be 0, but allow for numerical discrepency
 
-		nf.tmp[ts+1,,] = pop_lg(Frs[t,,], nf.tmp[ts,,], sr,alphas, fkd, fkc,fkd.yes  )
+	# while (tcomp == 0 ){
+
+	# 	nf.tmp[ts+1,,] = pop_lg(Frs[t,,], nf.tmp[ts,,], sr,alphas, fkd, fkc,fkd.yes  )
 		
-		#Test for stationarity of community
-		#if ( (mean(mean(nf[(ts+1),,]/nf[(ts),,]))-1) <= comp_thresh){ tcomp=1; is.final=T}
-		if ( round(mean(mean(nf.tmp[(ts+1),,]/nf.tmp[(ts),,],na.rm=T),na.rm=T)-1,comp_thresh) == 0){ tcomp=1; is.final=T}
+	# 	#Test for stationarity of community
+	# 	#if ( (mean(mean(nf[(ts+1),,]/nf[(ts),,]))-1) <= comp_thresh){ tcomp=1; is.final=T}
+	# 	if ( round(mean(mean(nf.tmp[(ts+1),,]/nf.tmp[(ts),,],na.rm=T),na.rm=T)-1,comp_thresh) == 0){ tcomp=1; is.final=T}
 
-		#Stop if burn limit is reached
-		if(ts >= burns) {tcomp=1; is.final=F}
-		ts = ts+1
+	# 	#Stop if burn limit is reached
+	# 	if(ts >= burns) {tcomp=1; is.final=F}
+	# 	ts = ts+1
 
-	}
+	# }
 
-	nf[t,,] = nf.tmp[(ts-1),,]
+	#nf[t,,] = nf.tmp[(ts-1),,]
 
 	y.full[[t]]= y 
 	w.eq.full[[t]]=w.eq
-	env_analogue_all[[t]] = env_analogue 
+	#env_analogue_all[[t]] = env_analogue 
 	env_var[[t]] = xx_new[,env.ind]
 
 print(t) #End loop through time
@@ -1710,4 +1712,4 @@ file.name = (paste(f.name1, "_waldmean.var",sep=""))
 save(file=file.name, "l1", "D", "var_mu_Us","cov_e_mu_Us",
 "cov_lam_vc", "cov_lam_vc2", "Elam1", "Elam2", "gr1.n", "gr1", "y.full", 
 "w.eq.full","ldg.sim", "ldgIMP.sim", "covIMP.sim", "Frs", "env_analogue_all",
-"sim.impacts", "sim.impactsIMP","covIMP.impacts","lded","nf","is.final","Frs_ci")
+"sim.impacts", "sim.impactsIMP","covIMP.impacts","lded","nf","Frs_ci")

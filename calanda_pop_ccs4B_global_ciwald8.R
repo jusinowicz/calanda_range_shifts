@@ -88,8 +88,8 @@ options(glmerControl=list(check.nobs.vs.rankZ = "warning",
 #=============================================================================
 #For naming files
 #=============================================================================
-#f.name1=c("calanda_ccs26B_tsmfull3_2017")
-f.name1=c("calanda_ccs85B_tsmfull3_2017")
+f.name1=c("calanda_ccs26B_tsmfull_global_2017")
+#f.name1=c("calanda_ccs85B_tsmfull_global_2017")
 #=============================================================================
 #Data: (see calanda2017.R)
 #=============================================================================
@@ -97,11 +97,11 @@ load(file="calanda_allB2017_2.var")
 rm(allB)
 
 #With climate-change scenarios:
-ccs_temp = read.csv("rcp85_2019_2100.csv")[2:3]
-#ccs_temp = read.csv("rcp26_2019_2100.csv")[2:3]
+#ccs_temp = read.csv("rcp85_2019_2100.csv")[2:3]
+ccs_temp = read.csv("rcp26_2019_2100.csv")[2:3]
 
-ccs_soil = read.csv("rcp85_mrso_2019_2100.csv")[1:2]
-#ccs_soil = read.csv("rcp26_mrso_2019_2100.csv")[1:2]
+#ccs_soil = read.csv("rcp85_mrso_2019_2100.csv")[1:2]
+ccs_soil = read.csv("rcp26_mrso_2019_2100.csv")[1:2]
 
 #=============================================================================
 #Some necessary tweaks to the data set to fix various things 
@@ -742,7 +742,7 @@ b_rr=c(.1,.1,.1) #10 cm plots
 ###Dispersal distance -- These are calculated using the WALD model --see 
 #wald_model1.R
 
-#a_rr= c(1/(100*np),1/(100*np),1/(100*np) #essentially global
+a_rr= c(1/(100*np),1/(100*np),1/(100*np) )#essentially global
 #a_rr=c(1/50,1/50,1/50)
 #Set the means (for an exponential) to what they are in the WALD kernel below 
 
@@ -810,76 +810,76 @@ for(sp in 1:length(spp)){
 
 #u_mean = get.u_mean(site_files, headers=FALSE, col_name = )
 
-#Site-specific means from get.u_mean
-u_mean_sites=c(1.157264,1.253033,1.070176, 1.045009, 2.845403)
-u_var_sites = c(0.5265219,0.6048379,0.4641298,0.5813984,5.014292 )
+# #Site-specific means from get.u_mean
+# u_mean_sites=c(1.157264,1.253033,1.070176, 1.045009, 2.845403)
+# u_var_sites = c(0.5265219,0.6048379,0.4641298,0.5813984,5.014292 )
 
-u_mean=mean(u_mean_sites)
+# u_mean=mean(u_mean_sites)
 
-#u_mean = 2.85 #Mean windspeed above canopy NOTE: Old value
-Vt=c(2.6,3,3.3) #terminal velocity DG maybe 2.6, AX maybe 3, HN maybe 3.3
+# #u_mean = 2.85 #Mean windspeed above canopy NOTE: Old value
+# Vt=c(2.6,3,3.3) #terminal velocity DG maybe 2.6, AX maybe 3, HN maybe 3.3
 
-#Model parameters for the Beta function: Based on Su et al. 2001
-a1=1.05
-a2=2
-a3=0.1
+# #Model parameters for the Beta function: Based on Su et al. 2001
+# a1=1.05
+# a2=2
+# a3=0.1
 
-kd=array(c(matrix(0,np,np),matrix(0,np,np)),dim=c(np,np,nspp)) 
-fkd=kd
+# kd=array(c(matrix(0,np,np),matrix(0,np,np)),dim=c(np,np,nspp)) 
+# fkd=kd
 
-wald.list = NULL
-for( s in 1:nspp){ 
-
-	#This version just uses the average height
-	height_k2 = matrix(c(colMeans(height_krig)),np,nspp, byrow=T)
-
-
-	#The variable wald.list[[s]] will contain a list with: 
-	#site.kernels[[1]][[1]]		the dispersal kernel
-	#site.kernels[[1]][[2]]		the mean dispersal distance
-	#site.kernels[[1]][[3]]		the 90th percentile distance 
-
-	#Pick version of height for kernel:
-	#Variable height
-	#wald.list[[s]] = get.WALD.kernel(u_mean, xx0, height_krig[,s]/100, Vt[s],a1,a2,a3 )[[1]][[1]]
-
-	#Mean height
-	wald.list[[s]] = get.WALD.kernel(u_mean, xx0, height_k2[,s]/100, Vt[s],a1,a2,a3 )[[1]][[1]]
-
-	kd[2:ceiling(np/2),,s] = wald.list[[s]][floor(np/2):1,]
-	kd[ceiling(np/2):(np-1),,s] = wald.list[[s]][1:floor(np/2),]
-
-
-	#Normalize again. 
-	#Because get.WALD.kernel normalizes the right half of the kernel to 1
-	kd[,,s]=kd[,,s]/matrix(colSums(kd[,,s],na.rm=T),np,np,byrow=T)
-	kd[,,s][is.na(kd[,,s])] = 0
-
-	#FFT
-	fkd[,,s]=mvfft(kd[,,s])#/(np+1)
-	fkd.yes=TRUE #Pass the transformed kd to functions later for speed
-
-}
-
-#Need these for testing the effect of each site on LGR later on
-kd.n = kd[-np,,]
-fkd.n = kd.n
-for (sa in 1:nspp) {fkd.n[,,sa]=mvfft(kd.n[,,sa]) }
-
-#Set the means (for an exponential) to what they are in the WALD kernel: 
-a_rr = c(1/wald.list[[1]][[2]],1/wald.list[[2]][[2]],1/wald.list[[3]][[2]])
-
-#Exponential kernel
-# kd=matrix(0,np,nspp)
-# fkd=matrix(0,np,nspp)
-
+# wald.list = NULL
 # for( s in 1:nspp){ 
-# 	kd[,s] = a_rr[s]/2*exp(-a_rr[s]*abs(xx0))
-# 	kd[,s]=kd[,s]/(sum(kd[,s]))
-# 	fkd[,s]=fft(kd[,s])#/(np+1)
-# 	fkd.yes = TRUE #Pass the transformed kd to functions later for speed
+
+# 	#This version just uses the average height
+# 	height_k2 = matrix(c(colMeans(height_krig)),np,nspp, byrow=T)
+
+
+# 	#The variable wald.list[[s]] will contain a list with: 
+# 	#site.kernels[[1]][[1]]		the dispersal kernel
+# 	#site.kernels[[1]][[2]]		the mean dispersal distance
+# 	#site.kernels[[1]][[3]]		the 90th percentile distance 
+
+# 	#Pick version of height for kernel:
+# 	#Variable height
+# 	#wald.list[[s]] = get.WALD.kernel(u_mean, xx0, height_krig[,s]/100, Vt[s],a1,a2,a3 )[[1]][[1]]
+
+# 	#Mean height
+# 	wald.list[[s]] = get.WALD.kernel(u_mean, xx0, height_k2[,s]/100, Vt[s],a1,a2,a3 )[[1]][[1]]
+
+# 	kd[2:ceiling(np/2),,s] = wald.list[[s]][floor(np/2):1,]
+# 	kd[ceiling(np/2):(np-1),,s] = wald.list[[s]][1:floor(np/2),]
+
+
+# 	#Normalize again. 
+# 	#Because get.WALD.kernel normalizes the right half of the kernel to 1
+# 	kd[,,s]=kd[,,s]/matrix(colSums(kd[,,s],na.rm=T),np,np,byrow=T)
+# 	kd[,,s][is.na(kd[,,s])] = 0
+
+# 	#FFT
+# 	fkd[,,s]=mvfft(kd[,,s])#/(np+1)
+# 	fkd.yes=TRUE #Pass the transformed kd to functions later for speed
 
 # }
+
+# #Need these for testing the effect of each site on LGR later on
+# kd.n = kd[-np,,]
+# fkd.n = kd.n
+# for (sa in 1:nspp) {fkd.n[,,sa]=mvfft(kd.n[,,sa]) }
+
+# #Set the means (for an exponential) to what they are in the WALD kernel: 
+# a_rr = c(1/wald.list[[1]][[2]],1/wald.list[[2]][[2]],1/wald.list[[3]][[2]])
+
+#Exponential kernel
+kd=matrix(0,np,nspp)
+fkd=matrix(0,np,nspp)
+
+for( s in 1:nspp){ 
+	kd[,s] = a_rr[s]/2*exp(-a_rr[s]*abs(xx0))
+	kd[,s]=kd[,s]/(sum(kd[,s]))
+	fkd[,s]=fft(kd[,s])#/(np+1)
+	fkd.yes = TRUE #Pass the transformed kd to functions later for speed
+
+}
 
 
 # kd=matrix(0,np,nspp)
