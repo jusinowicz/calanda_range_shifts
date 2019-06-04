@@ -93,7 +93,7 @@ options(glmerControl=list(check.nobs.vs.rankZ = "warning",
 #For naming files
 #=============================================================================
 #f.name1=c("calanda_ccs26_temp2_2017")
-f.name1=c("calanda_ccs26_tsm2_fastpt1_2017")
+f.name1=c("calanda_ccs26_tsm2_fastpt2_2017")
 #f.name1=c("calanda_ccs26_tsmfull2_2017")
 #f.name1=c("calanda_ccs85_temp2_2017")
 #f.name1=c("calanda_ccs85_tsm2_fast_2017")
@@ -111,6 +111,10 @@ ccs_temp = read.csv("rcp26_2019_2100.csv")[2:3]
 #ccs_soil = read.csv("rcp85_mrso_2019_2100.csv")[1:2]
 ccs_soil = read.csv("rcp26_mrso_2019_2100.csv")[1:2]
 
+
+#load a data file if in the middle of a run: 
+f.name.load=c("calanda_ccs26_tsm2_fastpt1_2017_waldmean.var")
+load(f.name.load)
 #=============================================================================
 #Some necessary tweaks to the data set to fix various things 
 #=============================================================================
@@ -980,6 +984,8 @@ env_var = vector(ttot, mode="list")
 cc=array(c(matrix(0,ngenst,np),matrix(0,ngenst,np)),dim=c(ngenst,np,nspp)) 
 
 #t=20
+load(f.name.load)
+#Make sure to fit the Frs for t =1
 for( t in 20: ngenst){ 
 
 	#set.seed(2)
