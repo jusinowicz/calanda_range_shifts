@@ -68,7 +68,7 @@ library(plyr)
 library(MASS)
 library(fields)
 library(viridis)
-source("./wald_functions1.R")
+source("./wald_functions2.R")
 source("./range_coexistence_functionsWALD.R")
 #source("./range_coexistence_functionsD.R") #The old library
 
@@ -244,9 +244,9 @@ variable_mat = colnames(allB2)[c(14,17,30,32,33,34,37)]
 # Control which variables to use. Should include at least year and mean temp
 #v_use= variable_mat[c(2,6)] #Temp only 
 #v_use= variable_mat[c(2,7)] #Soil moisture only 	
-v_use= variable_mat[c(2,6,7)] #Temp + soil moisture
+#v_use= variable_mat[c(2,6,7)] #Temp + soil moisture
 #v_use= variable_mat[c(2,4,6,7)] #Temp + soil moisture+min_temp
-#v_use= variable_mat[c(2,3,6,7)] #Temp + soil moisture+max_gdd
+v_use= variable_mat[c(2,3,6,7)] #Temp +max_gdd + soil_moist
 #v_use= variable_mat[c(2,3,4,6,7)] #Temp + soil moisture + max_gdd+ gs_mean_temp 
 #v_use= variable_mat[c(2,1,3,4,6,7)] #elevation+Temp + soil moisture + max_gdd+ gs_mean_temp 
 
@@ -1428,7 +1428,8 @@ for( t in 1: ngenst){
 	####Intrinsic ranges
 	Frs[t,,] =matrix(rr_krig*flower_probK,np,nspp)
 
-	#Rescaled from data:
+	#This is to make sure that consecutive projected years are rescaled relative
+	#to the first year of reproduction. 
 	max(flower_act[,sa],na.rm=T)
 	for( sa in 1:nspp){
 

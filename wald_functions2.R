@@ -99,40 +99,39 @@ get.beta_sum = function (a1,a2,a3,a4) {
 #Cd=0.2       Fixed parameter, see Massman and Weil 1999
 #
 #This function returns sigma_end for the flux profile
-get.sigma_end = function (a1,a2,a3, ustar, h, LAI=2.8, alpha=0.06, Cd=0.2, alpha1=0.6 ) {
+get.sigma_end = function (a1,a2,a3, h, LAI=2.8, alpha=0.06, Cd=0.2, alpha1=0.6 ) {
 
   #Start by calculating a(z) i.e. from Massman and Weil 1999, pg 9. 
-  eta=seq(0,1,0.01)
+  df = 0.01
+  eta=seq(0,1,df)
   pv=0.1
   a4=(a2*pv+a2*a3)/(a1-pv) #solve for a4 at a certain peak value. 
   #Note, by setting this < h, we're saying that the top of the canopy is not the peak in
   #foliar density
-  beta_sum = get.beta_sum(a1,a2,a3,a4)
-
+  beta1 = ((a1-eta)^a2*(a3+eta)^a4)
+  #beta_sum = sum(beta1)
+  beta_max = max(beta1)
   #The distribution of foliage
-  az=LAI/h *((a1-eta)^a2*(a3+eta)^a4)/beta_sum
+  #az=LAI/h *beta1/beta_sum
+  az=LAI/h *beta1/beta_max
+
   #plot(az,eta)
 
-  #Then use this to generate the necessary parameters related to canopy flux profiles
-  #For sigma_end
-  #The normalizing integral
-  F3 = function(a1,a2,a3,a4){
-      f3 = function(x){
-        ((a1-x)^a2*(a3+x)^a4)
-     }
-    return(f3)
-  }
-
+  #Use a(z) to generate canopy flux profiles for sigma_end
   sigma_end=matrix(0, length(eta),1)
   zindex=1
-  for(z in seq(0, 1,0.01)){
-    sigma_end[zindex]=Cd/beta_sum* LAI/h *integrate(F3 (a1,a2,a3,a4),lower=0,upper=z)$value
-    zindex=zindex+1
+  for(z in 1:length(eta)){
+    sig_tmp = Cd * az[1:z]
+    sigma_end[z]= sum(sig_tmp)*df
   }
 
-  sigma_end=sigma_end/max(sigma_end)
-  
-  return(sigma_end)
+  #Use sigma_end to get ustar
+  c1= 0.320; c2= 0.264; c3=15.1 #From Su et al. 2001 
+  ustar = c1 - c2*exp(-c3*(sigma_end[h/df]))
+
+  sigma=list(az = az, sigma_end=sigma_end,ustar=ustar)
+
+  return(sigma)
 }
 
 #=============================================================================
@@ -154,8 +153,9 @@ get.sigma_end = function (a1,a2,a3, ustar, h, LAI=2.8, alpha=0.06, Cd=0.2, alpha
 #of Katul 2005 or Massman and Weil 1999. 
 #
 
-get.m_sigma_w = function (a1,a2,a3,u_mean,ustar=0.5, h=1, alpha1=0.6, Au =2.1, Av = 1.8, Aw=1.1) {
+get.m_sigma_w = function (a1,a2,a3,u_mean, h=1, alpha1=0.6, Au =2.1, Av = 1.8, Aw=1.1) {
 
+  df = 0.01 #This is the scaling factor used throughout
   nu1=(Au^2+Av^2+Aw^2)^(1/2)
   nu3=(Au^2+Av^2+Aw^2)^(3/2)
   A2=3*nu1/alpha1^2
@@ -164,23 +164,26 @@ get.m_sigma_w = function (a1,a2,a3,u_mean,ustar=0.5, h=1, alpha1=0.6, Au =2.1, A
   #The empirical mean of the wind profile above canopy
   #u_mean = get.u_mean()
 
-  B1= (-9*ustar/u_mean)/(2*alpha1*nu1*(9/4-A2*(ustar^4/u_mean^4)))
-
+  #Get the canopy density profile, flux profile, and ustar
+  #E.g. Su et al 2012, Massman 1999
+  se=get.sigma_end(a1,a2,a3,h)
+  ustar = se$ustar
+  sigma_end = se$sigma_end
+  az = se$az
 
   #Calculate the energy variance, sigma_e, which is the key to calculating 
-  #all of the velocity variances. 
-  sigma_end=get.sigma_end(a1,a2,a3, ustar, h)
-  gamma_z= 1 - sigma_end/sigma_end[(h/0.01)]
-  n=0.5*(ustar/(u_mean))^(0.5) * sigma_end[(h/0.01)]
-
-  sigma_e=ustar*(nu3*exp(-A2*sigma_end[(h/0.01)]*gamma_z)+B1*(exp(-3*n*gamma_z)-exp(-A2*sigma_end[(h/0.01)]*gamma_z) ))^(1/3)
+  #all of the velocity variances. See Katul et al. 2005, Massman and Weil 1999.
+  gamma_z= 1 - sigma_end/sigma_end[(h/df)]
+  B1= (-9*ustar/u_mean)/(2*alpha1*nu1*(9/4-A2*(ustar^4/u_mean^4)))
+  n=0.5*(ustar/(u_mean))^(-2) * sigma_end[(h/df)]
+  sigma_e=ustar*(nu3*exp(-A2*sigma_end[(h/df)]*gamma_z)+B1*(exp(-3*n*gamma_z)-exp(-A2*sigma_end[(h/df)]*gamma_z) ))^(1/3)
 
   #Now each of these follow:
   #For 1D we just need sigma_w, vertical variance: 
   sigma_w=Aw*nu1*sigma_e
 
   #"Integrate" 
-  m_sigma_w = Aw*nu1*(sum(sigma_e,na.rm=T)*0.01)
+  m_sigma_w = Aw*nu1*(sum(sigma_e,na.rm=T)*df)
 
   return(m_sigma_w)
 }
@@ -191,16 +194,21 @@ get.m_sigma_w = function (a1,a2,a3,u_mean,ustar=0.5, h=1, alpha1=0.6, Au =2.1, A
 #u_mean       Mean horizontal windspeed at the canopy top (from field data)
 #a1,a2,a3     Parameters for the Beta function: E.g.  Su et al. 2001
 #h=1          canopy height (or sensor height) in meters
-#ustar=0.5    Fixed parameter, see Massman and Weil 1999
 
-get.m_u_mean = function ( a1,a2,a3,u_mean,h=1,ustar=0.5){
-  sigma_end=get.sigma_end(a1,a2,a3,ustar, h)
+get.m_u_mean = function ( a1,a2,a3,u_mean,h=1){
+  df = 0.01
+ #Get the canopy density profile, flux profile, and ustar
+  #E.g. Su et al 2012, Massman 1999
+  se=get.sigma_end(a1,a2,a3,h)
+  ustar = se$ustar
+  sigma_end = se$sigma_end
+  az = se$az
 
-  gamma_z= 1 - sigma_end/sigma_end[(h/0.01)]
-  n=0.5*(ustar/(u_mean))^(0.5) * sigma_end[(h/0.01)]
+  gamma_z= 1 - sigma_end/sigma_end[(h/df)]
+  n=0.5*(ustar/(u_mean))^(0.5) * sigma_end[(h/df)]
 
   #u_mean_z=u_mean*exp(-n*gamma_z)
-  m_u_mean = u_mean*sum(exp(-n*gamma_z))*0.01
+  m_u_mean = u_mean*sum(exp(-n*gamma_z))*df
 
 
 }
